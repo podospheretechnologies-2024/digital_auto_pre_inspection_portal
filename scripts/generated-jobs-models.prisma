@@ -285,6 +285,7 @@ model tbl_jobs {
   updated_user_id Int?
   updated_at DateTime?
   is_deleted Int @default(0) @db.TinyInt
+  on_hold Int @default(0) @db.TinyInt
 
   @@map("tbl_jobs")
 }
