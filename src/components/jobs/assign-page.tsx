@@ -70,7 +70,6 @@ const emptyForm = {
   company_id: "",
   model_id: "",
   variant_id: "",
-  agent_id: "",
   remark: "",
 };
 
@@ -165,7 +164,7 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
           company_id: Number(form.company_id),
           model_id: Number(form.model_id),
           variant_id: Number(form.variant_id),
-          agent_id: form.agent_id ? Number(form.agent_id) : null,
+          agent_id: null,
         }),
       }),
     onSuccess: () => {
@@ -226,7 +225,7 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
       ? "status: fresh — assign a surveyor to move to assigned"
       : mode === "schedule"
         ? "status: assigned — upload images & submit inspection → qc_pending"
-        : "Creates a case (status: fresh). Optionally assign surveyor now.";
+        : "Creates a case (status: fresh). Assign the surveyor later on Fresh Case.";
 
   function renderTable(rows: JobRow[] | undefined, showAssign: boolean) {
     return (
@@ -393,7 +392,7 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
           <CardHeader>
             <CardTitle>New intimation</CardTitle>
             <CardDescription>
-              Create a case and assign a surveyor
+              Create a fresh case. Assign the surveyor on Fresh Case.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -565,23 +564,6 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
                   {variants.map((v) => (
                     <option key={v.id} value={v.id}>
                       {v.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Agent (optional)</Label>
-                <select
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
-                  value={form.agent_id}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, agent_id: e.target.value }))
-                  }
-                >
-                  <option value="">Unassigned</option>
-                  {agents.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
                     </option>
                   ))}
                 </select>
