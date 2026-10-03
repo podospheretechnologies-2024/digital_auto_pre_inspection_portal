@@ -1,0 +1,674 @@
+model tbl_2wheeler {
+  id Int @id @default(autoincrement())
+  job_id Int?
+  proposer String? @db.VarChar(200)
+  insurer_broker String? @db.VarChar(200)
+  inspection_place String? @db.VarChar(50)
+  insurer_ref_no String? @db.VarChar(50)
+  ins_broker_name String? @db.VarChar(50)
+  ins_broker_mobileno String? @db.VarChar(50)
+  ins_broker_mailid String? @db.VarChar(50)
+  ins_broker_agentcode String? @db.VarChar(50)
+  inspection_case String? @db.VarChar(50)
+  inspection_type String? @db.VarChar(50)
+  vehicleno String? @db.VarChar(200)
+  chassisno String? @db.VarChar(200)
+  engineno String? @db.VarChar(200)
+  company_id Int?
+  model_id Int?
+  variant_id Int?
+  year_of_manufacture String? @db.VarChar(200)
+  odometer_reading String? @db.VarChar(200)
+  rc_verified String? @db.VarChar(200)
+  helmetbox String? @db.VarChar(100)
+  laggage_carrier String? @db.VarChar(100)
+  stepney String? @db.VarChar(100)
+  leggaurd String? @db.VarChar(100)
+  saree_gaurd String? @db.VarChar(100)
+  fron_left_ind_light String? @db.VarChar(100)
+  fron_right_ind_light String? @db.VarChar(100)
+  front_mudgaurd String? @db.VarChar(50)
+  front_hub_disc_drum String? @db.VarChar(50)
+  front_wheel_rim String? @db.VarChar(50)
+  from_shock_absorber String? @db.VarChar(50)
+  speedometer_tachometer String? @db.VarChar(50)
+  lever_clutch_hand_break String? @db.VarChar(50)
+  chassis_frame String? @db.VarChar(50)
+  crankCase_cylinder String? @db.VarChar(50)
+  head_lamp_rim String? @db.VarChar(50)
+  silencer String? @db.VarChar(50)
+  chain_cover String? @db.VarChar(50)
+  fork String? @db.VarChar(50)
+  fairing String? @db.VarChar(50)
+  fuel_tank String? @db.VarChar(50)
+  kick_padal String? @db.VarChar(50)
+  handel_bar String? @db.VarChar(50)
+  rear_wheel_rim String? @db.VarChar(50)
+  rear_shock_absorber String? @db.VarChar(50)
+  rear_drum_disc String? @db.VarChar(50)
+  rear_left_indicator_light String? @db.VarChar(50)
+  rear_right_indicator_light String? @db.VarChar(50)
+  rear_view_mirror_lt String? @db.VarChar(50)
+  rear_view_mirror_rt String? @db.VarChar(50)
+  rear_foot_rest String? @db.VarChar(50)
+  rear_mudguard String? @db.VarChar(50)
+  left_cover_shield String? @db.VarChar(50)
+  right_cover_shield String? @db.VarChar(50)
+  wisor String? @db.VarChar(50)
+  tail_lamp String? @db.VarChar(50)
+  tyres_front String? @db.VarChar(50)
+  leg_side_right String? @db.VarChar(50)
+  leg_shield_left String? @db.VarChar(50)
+  inspection_status String? @db.VarChar(200)
+  rear_cowl_left_centre_right String? @db.VarChar(100)
+  stepney_bracket String? @db.VarChar(100)
+  remarks String? @db.MediumText
+  valuation_price Float?
+  ownership_name String? @db.VarChar(191)
+  video String? @db.MediumText
+  s3video_url String? @db.VarChar(255)
+  chassisphoto String? @db.MediumText
+  qc Int @default(0) @map("QC")
+  qc_checked_by String? @db.VarChar(100)
+  qc_datetime DateTime?
+  inspect_by Int @default(0)
+  ctime String @default("") @db.VarChar(20)
+  created_at DateTime?
+  updated_at DateTime?
+
+  @@map("tbl_2wheeler")
+}
+
+model tbl_3wheeler {
+  id Int @id @default(autoincrement())
+  job_id Int?
+  proposer String? @db.VarChar(200)
+  insurer_broker String? @db.VarChar(200)
+  insurer_ref_no String? @db.VarChar(200)
+  ins_broker_name String? @db.VarChar(50)
+  ins_broker_mobileno String? @db.VarChar(50)
+  ins_broker_mailid String? @db.VarChar(50)
+  ins_broker_agentcode String? @db.VarChar(50)
+  inspection_case String? @db.VarChar(50)
+  inspection_type String? @db.VarChar(50)
+  inspection_place String? @db.MediumText
+  vehicleno String? @db.VarChar(200)
+  chassisno String? @db.VarChar(200)
+  engineno String? @db.VarChar(200)
+  company_id Int?
+  model_id Int?
+  variant_id Int?
+  year_of_manufacture String? @db.VarChar(200)
+  odometer_reading String? @db.VarChar(200)
+  rc_verified String? @db.VarChar(200)
+  colour String? @db.VarChar(100)
+  fuel_used String? @db.VarChar(100)
+  tyre_of_body String? @db.VarChar(100)
+  chassis_production_no String? @db.VarChar(50)
+  stereo_make String? @db.VarChar(50)
+  cowl String? @db.VarChar(50)
+  cabin String? @db.VarChar(50)
+  front_excavator String? @db.VarChar(50)
+  boom String? @db.VarChar(50)
+  chassis_frame String? @db.VarChar(50)
+  stepney String? @db.VarChar(50)
+  left_mudguard String? @db.VarChar(50)
+  grill String? @db.VarChar(50)
+  front_body String? @db.VarChar(50)
+  bonnet String? @db.VarChar(50)
+  ac String? @db.VarChar(50)
+  fuel_tank String? @db.VarChar(50)
+  head_light String? @db.VarChar(50)
+  right_mudguard String? @db.VarChar(50)
+  dashboard String? @db.VarChar(50)
+  right_body String? @db.VarChar(50)
+  cran_bucket String? @db.VarChar(50)
+  fans String? @db.VarChar(50)
+  seats String? @db.VarChar(50)
+  indicator_light String? @db.VarChar(50)
+  cabin_lt_door String? @db.VarChar(50)
+  crane_hook String? @db.VarChar(50)
+  hydraulic_system String? @db.VarChar(50)
+  tyres String? @db.VarChar(50)
+  rear_body String? @db.VarChar(50)
+  cabin_rt_door String? @db.VarChar(50)
+  bumper String? @db.VarChar(50)
+  left_body String? @db.VarChar(50)
+  ws_glasses String? @db.VarChar(50)
+  excavator_cabin_glass String? @db.VarChar(50)
+  left_window_glass String? @db.VarChar(50)
+  crane_cabin_glass String? @db.VarChar(50)
+  right_window_glasses String? @db.VarChar(50)
+  rear_view_body String? @db.VarChar(50)
+  back_glass String? @db.VarChar(50)
+  tail_lamp String? @db.VarChar(50)
+  extra_fittings String? @db.VarChar(50)
+  market_value String? @db.VarChar(50)
+  chassisphoto String? @db.MediumText
+  qc Int @default(0) @map("QC")
+  qc_checked_by String? @db.VarChar(100)
+  qc_datetime DateTime?
+  ctime String @default("") @db.VarChar(20)
+  inspection_status String? @db.VarChar(200)
+  remarks String? @db.MediumText
+  valuation_price Float?
+  ownership_name String? @db.VarChar(191)
+  video String? @db.MediumText
+  s3video_url String? @db.VarChar(255)
+  inspect_by Int @default(0)
+  created_at DateTime?
+  updated_at DateTime?
+
+  @@map("tbl_3wheeler")
+}
+
+model tbl_4wheeler {
+  id Int @id @default(autoincrement())
+  job_id Int?
+  proposer String? @db.VarChar(200)
+  insurer_broker String? @db.VarChar(200)
+  insurer_ref_no String? @db.VarChar(50)
+  ins_broker_name String? @db.VarChar(50)
+  ins_broker_mobileno String? @db.VarChar(50)
+  ins_broker_mailid String? @db.VarChar(50)
+  ins_broker_agentcode String? @db.VarChar(50)
+  inspection_case String? @db.VarChar(50)
+  inspection_type String? @db.VarChar(50)
+  inspection_place String? @db.MediumText
+  vehicleno String? @db.VarChar(59)
+  chassisno String? @db.VarChar(59)
+  engineno String? @db.VarChar(59)
+  company_id Int?
+  model_id Int?
+  variant_id Int?
+  year_of_manufacture String? @db.VarChar(50)
+  odometer_reading String? @db.VarChar(50)
+  rc_verified String? @db.VarChar(50)
+  colour String? @db.VarChar(50)
+  fuel_used String? @db.VarChar(50)
+  stepney_make_dot_no String? @db.VarChar(50)
+  rh_front_tyre_dot_no String? @db.VarChar(50)
+  lh_front_tyre_dot_no String? @db.VarChar(50)
+  lh_rear_tyre_dot_no String? @db.VarChar(50)
+  stereo_make String? @db.VarChar(50)
+  cd_charger_make String? @db.VarChar(50)
+  other_electrical String? @db.VarChar(50)
+  seat_cover String? @db.VarChar(50)
+  center_lock String? @db.VarChar(50)
+  gear_locking String? @db.VarChar(50)
+  other_non_electrical String? @db.VarChar(50)
+  front_bumper String? @db.VarChar(50)
+  indicator_light_lt String? @db.VarChar(50)
+  front_panel String? @db.VarChar(50)
+  dicky String? @db.VarChar(50)
+  grill String? @db.VarChar(50)
+  indicator_light_rt String? @db.VarChar(50)
+  bonnet String? @db.VarChar(50)
+  reat_bumper String? @db.VarChar(50)
+  head_lamp_lt String? @db.VarChar(50)
+  fog_lamp_lt String? @db.VarChar(50)
+  left_apron String? @db.VarChar(50)
+  tail_lamp_lt String? @db.VarChar(50)
+  head_lamp_rt String? @db.VarChar(50)
+  fog_lamp_rt String? @db.VarChar(50)
+  right_apron String? @db.VarChar(50)
+  tail_lamp_rt String? @db.VarChar(50)
+  lt_frontfender String? @db.VarChar(50)
+  lt_pillar_door_a String? @db.VarChar(50)
+  lt_frontdoor String? @db.VarChar(50)
+  lt_pillar_center_b String? @db.VarChar(50)
+  lt_reardoor String? @db.VarChar(50)
+  lt_pillar_door_c String? @db.VarChar(50)
+  lt_runningboard String? @db.VarChar(50)
+  lt_qtr_panel String? @db.VarChar(50)
+  rt_qtr_panel String? @db.VarChar(50)
+  rt_pillar_door_b String? @db.VarChar(50)
+  floor_silencer String? @db.VarChar(50)
+  rt_rear_door String? @db.VarChar(50)
+  rt_rear_pillar_c String? @db.VarChar(50)
+  rear_view_mirror_lt String? @db.VarChar(50)
+  rt_front_door String? @db.VarChar(50)
+  rt_running_board String? @db.VarChar(50)
+  rear_view_mirror_rt String? @db.VarChar(50)
+  rt_front_pillar_a String? @db.VarChar(50)
+  rt_front_fender String? @db.VarChar(50)
+  tyres String? @db.VarChar(50)
+  back_glass String? @db.VarChar(50)
+  rf_door_glass String? @db.VarChar(50)
+  lf_door_glass String? @db.VarChar(50)
+  rh_rear_tyre_dot_no String? @db.VarChar(100)
+  rim String? @db.VarChar(50)
+  front_ws_glass_laminate String? @db.VarChar(50)
+  rr_door_glass String? @db.VarChar(50)
+  lr_door_glass String? @db.VarChar(50)
+  under_carriage String? @db.VarChar(50)
+  inspection_status String? @db.VarChar(200)
+  remarks String? @db.MediumText
+  valuation_price Float?
+  ownership_name String? @db.VarChar(191)
+  video String? @db.MediumText
+  s3video_url String? @db.VarChar(255)
+  chassisphoto String? @db.MediumText
+  qc Int @default(0) @map("QC")
+  qc_checked_by String? @db.VarChar(100)
+  qc_datetime DateTime?
+  ctime String @default("") @db.VarChar(20)
+  inspect_by Int @default(0)
+  created_at DateTime?
+  updated_at DateTime?
+
+  @@map("tbl_4wheeler")
+}
+
+model tbl_jobs {
+  id Int @id @default(autoincrement())
+  serial_no Int
+  dti_no String @db.VarChar(100)
+  fin_year String @db.VarChar(100)
+  bank_id Int?
+  bank_ref_no String? @db.VarChar(200)
+  agent_id Int?
+  company_id Int?
+  model_id Int?
+  variant_id Int?
+  cdate DateTime @db.Date
+  remark String? @db.Text
+  cname String? @db.VarChar(200)
+  mobileno String? @db.VarChar(200)
+  address String? @db.Text
+  mode String? @db.VarChar(100)
+  vehicleno String @db.VarChar(50)
+  vehicle_type String? @db.VarChar(100)
+  source String @default("WEB") @db.VarChar(10)
+  created_user_id Int
+  created_at DateTime?
+  updated_user_id Int?
+  updated_at DateTime?
+  is_deleted Int @default(0) @db.TinyInt
+
+  @@map("tbl_jobs")
+}
+
+model tbl_jobs_office {
+  id Int @id @default(autoincrement())
+  serial_no Int
+  dti_no String @db.VarChar(100)
+  fin_year String @db.VarChar(100)
+  bank_id Int
+  bank_ref_no String @db.VarChar(200)
+  agent_id Int?
+  company_id Int?
+  model_id Int?
+  variant_id Int?
+  cdate DateTime @db.Date
+  remark String? @db.Text
+  created_at DateTime?
+  updated_at DateTime?
+  cname String? @db.VarChar(200)
+  mobileno String? @db.VarChar(200)
+  address String? @db.Text
+  mode String? @db.VarChar(100)
+  vehicleno String? @db.VarChar(50)
+  vehicle_type String? @db.VarChar(100)
+  created_user_id Int
+
+  @@map("tbl_jobs_office")
+}
+
+model tbl_office {
+  id Int @id @default(autoincrement())
+  job_id Int?
+  prospect_no String? @db.VarChar(230)
+  applicant_name String? @db.VarChar(230)
+  lead_id String? @db.VarChar(230)
+  client_name String? @db.VarChar(230)
+  cpv_result String? @db.VarChar(230)
+  approved_by String? @db.VarChar(230)
+  verifier_comment String? @db.MediumText
+  supervisor_comment String? @db.MediumText
+  location String? @db.MediumText
+  is_reference String? @db.VarChar(230)
+  reference_detail String? @db.MediumText
+  relation String? @db.VarChar(230)
+  ref_mobile String? @db.VarChar(100)
+  reference_name2 String? @db.VarChar(100)
+  reference_relation2 String? @db.VarChar(50)
+  reference_mobile2 String? @db.VarChar(50)
+  visit_status String? @db.VarChar(230)
+  address String? @db.MediumText
+  visit_date DateTime? @db.Date
+  visit_time String? @db.VarChar(230)
+  vtime DateTime? @db.Time
+  remarks String? @db.MediumText
+  video String? @db.MediumText
+  s3video_url String? @db.VarChar(255)
+  qc Int @default(0) @map("QC")
+  qc_checked_by String? @db.VarChar(100)
+  qc_datetime DateTime?
+  inspect_by Int @default(0)
+  screenshot String? @db.MediumText
+  app_title String? @db.VarChar(50)
+  ctime String @default("") @db.VarChar(20)
+  created_at DateTime?
+  updated_at DateTime?
+
+  @@map("tbl_office")
+}
+
+model tbl_valuation_2wheeler {
+  id Int @id @default(autoincrement())
+  job_id Int?
+  proposer String? @db.VarChar(200)
+  insurer_broker String? @db.VarChar(200)
+  inspection_place String? @db.VarChar(10)
+  insurer_ref_no String? @db.VarChar(50)
+  ins_broker_name String? @db.VarChar(50)
+  ins_broker_mobileno String? @db.VarChar(50)
+  ins_broker_mailid String? @db.VarChar(50)
+  ins_broker_agentcode String? @db.VarChar(50)
+  inspection_case String? @db.VarChar(50)
+  inspection_type String? @db.VarChar(50)
+  vehicleno String? @db.VarChar(200)
+  chassisno String? @db.VarChar(200)
+  engineno String? @db.VarChar(200)
+  company_id Int?
+  model_id Int?
+  variant_id Int?
+  year_of_manufacture String? @db.VarChar(200)
+  odometer_reading String? @db.VarChar(200)
+  rc_verified String? @db.VarChar(200)
+  helmetbox String? @db.VarChar(100)
+  laggage_carrier String? @db.VarChar(100)
+  stepney String? @db.VarChar(100)
+  leggaurd String? @db.VarChar(100)
+  saree_gaurd String? @db.VarChar(100)
+  fron_left_ind_light String? @db.VarChar(100)
+  fron_right_ind_light String? @db.VarChar(100)
+  front_mudgaurd String? @db.VarChar(50)
+  front_hub_disc_drum String? @db.VarChar(50)
+  front_wheel_rim String? @db.VarChar(50)
+  from_shock_absorber String? @db.VarChar(50)
+  speedometer_tachometer String? @db.VarChar(50)
+  lever_clutch_hand_break String? @db.VarChar(50)
+  chassis_frame String? @db.VarChar(50)
+  crankCase_cylinder String? @db.VarChar(50)
+  head_lamp_rim String? @db.VarChar(50)
+  silencer String? @db.VarChar(50)
+  chain_cover String? @db.VarChar(50)
+  fork String? @db.VarChar(50)
+  fairing String? @db.VarChar(50)
+  fuel_tank String? @db.VarChar(50)
+  kick_padal String? @db.VarChar(50)
+  handel_bar String? @db.VarChar(50)
+  rear_wheel_rim String? @db.VarChar(50)
+  rear_shock_absorber String? @db.VarChar(50)
+  rear_drum_disc String? @db.VarChar(50)
+  rear_left_indicator_light String? @db.VarChar(50)
+  rear_right_indicator_light String? @db.VarChar(50)
+  rear_view_mirror_lt String? @db.VarChar(50)
+  rear_view_mirror_rt String? @db.VarChar(50)
+  rear_foot_rest String? @db.VarChar(50)
+  rear_mudguard String? @db.VarChar(50)
+  left_cover_shield String? @db.VarChar(50)
+  right_cover_shield String? @db.VarChar(50)
+  wisor String? @db.VarChar(50)
+  tail_lamp String? @db.VarChar(50)
+  tyres_front String? @db.VarChar(50)
+  leg_side_right String? @db.VarChar(50)
+  leg_shield_left String? @db.VarChar(50)
+  inspection_status String? @db.VarChar(200)
+  rear_cowl_left_centre_right String? @db.VarChar(100)
+  stepney_bracket String? @db.VarChar(100)
+  remarks String? @db.MediumText
+  valuation_price Float?
+  ownership_name String? @db.VarChar(191)
+  video String? @db.MediumText
+  s3video_url String? @db.VarChar(255)
+  chassisphoto String? @db.MediumText
+  qc Int @default(0) @map("QC")
+  qc_checked_by String? @db.VarChar(100)
+  qc_datetime DateTime?
+  is_price_valuation Int @default(0) @db.TinyInt
+  price_valuation_by Int?
+  price_valuation_datetime DateTime?
+  inspect_by Int @default(0)
+  ctime String @default("") @db.VarChar(20)
+  created_at DateTime?
+  updated_at DateTime?
+
+  @@map("tbl_valuation_2wheeler")
+}
+
+model tbl_valuation_3wheeler {
+  id Int @id @default(autoincrement())
+  job_id Int?
+  proposer String? @db.VarChar(200)
+  insurer_broker String? @db.VarChar(200)
+  insurer_ref_no String? @db.VarChar(200)
+  ins_broker_name String? @db.VarChar(50)
+  ins_broker_mobileno String? @db.VarChar(50)
+  ins_broker_mailid String? @db.VarChar(50)
+  ins_broker_agentcode String? @db.VarChar(50)
+  inspection_case String? @db.VarChar(50)
+  inspection_type String? @db.VarChar(50)
+  inspection_place String? @db.MediumText
+  vehicleno String? @db.VarChar(200)
+  chassisno String? @db.VarChar(200)
+  engineno String? @db.VarChar(200)
+  company_id Int?
+  model_id Int?
+  variant_id Int?
+  year_of_manufacture String? @db.VarChar(200)
+  odometer_reading String? @db.VarChar(200)
+  rc_verified String? @db.VarChar(200)
+  colour String? @db.VarChar(100)
+  fuel_used String? @db.VarChar(100)
+  tyre_of_body String? @db.VarChar(100)
+  chassis_production_no String? @db.VarChar(50)
+  stereo_make String? @db.VarChar(50)
+  cowl String? @db.VarChar(50)
+  cabin String? @db.VarChar(50)
+  front_excavator String? @db.VarChar(50)
+  boom String? @db.VarChar(50)
+  chassis_frame String? @db.VarChar(50)
+  stepney String? @db.VarChar(50)
+  left_mudguard String? @db.VarChar(50)
+  grill String? @db.VarChar(50)
+  front_body String? @db.VarChar(50)
+  bonnet String? @db.VarChar(50)
+  ac String? @db.VarChar(50)
+  fuel_tank String? @db.VarChar(50)
+  head_light String? @db.VarChar(50)
+  right_mudguard String? @db.VarChar(50)
+  dashboard String? @db.VarChar(50)
+  right_body String? @db.VarChar(50)
+  cran_bucket String? @db.VarChar(50)
+  fans String? @db.VarChar(50)
+  seats String? @db.VarChar(50)
+  indicator_light String? @db.VarChar(50)
+  cabin_lt_door String? @db.VarChar(50)
+  crane_hook String? @db.VarChar(50)
+  hydraulic_system String? @db.VarChar(50)
+  tyres String? @db.VarChar(50)
+  rear_body String? @db.VarChar(50)
+  cabin_rt_door String? @db.VarChar(50)
+  bumper String? @db.VarChar(50)
+  left_body String? @db.VarChar(50)
+  ws_glasses String? @db.VarChar(50)
+  excavator_cabin_glass String? @db.VarChar(50)
+  left_window_glass String? @db.VarChar(50)
+  crane_cabin_glass String? @db.VarChar(50)
+  right_window_glasses String? @db.VarChar(50)
+  rear_view_body String? @db.VarChar(50)
+  back_glass String? @db.VarChar(50)
+  tail_lamp String? @db.VarChar(50)
+  extra_fittings String? @db.VarChar(50)
+  market_value String? @db.VarChar(50)
+  chassisphoto String? @db.MediumText
+  qc Int @default(0) @map("QC")
+  qc_checked_by String? @db.VarChar(100)
+  qc_datetime DateTime?
+  is_price_valuation Int @default(0) @db.TinyInt
+  price_valuation_by Int?
+  price_valuation_datetime DateTime?
+  ctime String @default("") @db.VarChar(20)
+  inspection_status String? @db.VarChar(200)
+  remarks String? @db.MediumText
+  valuation_price Float?
+  ownership_name String? @db.VarChar(191)
+  video String? @db.MediumText
+  s3video_url String? @db.VarChar(255)
+  inspect_by Int @default(0)
+  created_at DateTime?
+  updated_at DateTime?
+
+  @@map("tbl_valuation_3wheeler")
+}
+
+model tbl_valuation_4wheeler {
+  id Int @id @default(autoincrement())
+  job_id Int?
+  proposer String? @db.VarChar(200)
+  insurer_broker String? @db.VarChar(200)
+  insurer_ref_no String? @db.VarChar(50)
+  ins_broker_name String? @db.VarChar(50)
+  ins_broker_mobileno String? @db.VarChar(50)
+  ins_broker_mailid String? @db.VarChar(50)
+  ins_broker_agentcode String? @db.VarChar(50)
+  inspection_case String? @db.VarChar(50)
+  inspection_type String? @db.VarChar(50)
+  inspection_place String? @db.MediumText
+  vehicleno String? @db.VarChar(59)
+  chassisno String? @db.VarChar(59)
+  engineno String? @db.VarChar(59)
+  company_id Int?
+  model_id Int?
+  variant_id Int?
+  year_of_manufacture String? @db.VarChar(50)
+  odometer_reading String? @db.VarChar(50)
+  rc_verified String? @db.VarChar(50)
+  colour String? @db.VarChar(50)
+  fuel_used String? @db.VarChar(50)
+  stepney_make_dot_no String? @db.VarChar(50)
+  rh_front_tyre_dot_no String? @db.VarChar(50)
+  lh_front_tyre_dot_no String? @db.VarChar(50)
+  lh_rear_tyre_dot_no String? @db.VarChar(50)
+  stereo_make String? @db.VarChar(50)
+  cd_charger_make String? @db.VarChar(50)
+  other_electrical String? @db.VarChar(50)
+  seat_cover String? @db.VarChar(50)
+  center_lock String? @db.VarChar(50)
+  gear_locking String? @db.VarChar(50)
+  other_non_electrical String? @db.VarChar(50)
+  front_bumper String? @db.VarChar(50)
+  indicator_light_lt String? @db.VarChar(50)
+  front_panel String? @db.VarChar(50)
+  dicky String? @db.VarChar(50)
+  grill String? @db.VarChar(50)
+  indicator_light_rt String? @db.VarChar(50)
+  bonnet String? @db.VarChar(50)
+  reat_bumper String? @db.VarChar(50)
+  head_lamp_lt String? @db.VarChar(50)
+  fog_lamp_lt String? @db.VarChar(50)
+  left_apron String? @db.VarChar(50)
+  tail_lamp_lt String? @db.VarChar(50)
+  head_lamp_rt String? @db.VarChar(50)
+  fog_lamp_rt String? @db.VarChar(50)
+  right_apron String? @db.VarChar(50)
+  tail_lamp_rt String? @db.VarChar(50)
+  lt_frontfender String? @db.VarChar(50)
+  lt_pillar_door_a String? @db.VarChar(50)
+  lt_frontdoor String? @db.VarChar(50)
+  lt_pillar_center_b String? @db.VarChar(50)
+  lt_reardoor String? @db.VarChar(50)
+  lt_pillar_door_c String? @db.VarChar(50)
+  lt_runningboard String? @db.VarChar(50)
+  lt_qtr_panel String? @db.VarChar(50)
+  rt_qtr_panel String? @db.VarChar(50)
+  rt_pillar_door_b String? @db.VarChar(50)
+  floor_silencer String? @db.VarChar(50)
+  rt_rear_door String? @db.VarChar(50)
+  rt_rear_pillar_c String? @db.VarChar(50)
+  rear_view_mirror_lt String? @db.VarChar(50)
+  rt_front_door String? @db.VarChar(50)
+  rt_running_board String? @db.VarChar(50)
+  rear_view_mirror_rt String? @db.VarChar(50)
+  rt_front_pillar_a String? @db.VarChar(50)
+  rt_front_fender String? @db.VarChar(50)
+  tyres String? @db.VarChar(50)
+  back_glass String? @db.VarChar(50)
+  rf_door_glass String? @db.VarChar(50)
+  lf_door_glass String? @db.VarChar(50)
+  fog_lamps String? @db.VarChar(50)
+  rh_rear_tyre_dot_no String? @db.VarChar(100)
+  rim String? @db.VarChar(50)
+  front_ws_glass_laminate String? @db.VarChar(50)
+  rr_door_glass String? @db.VarChar(50)
+  lr_door_glass String? @db.VarChar(50)
+  under_carriage String? @db.VarChar(50)
+  others String? @db.VarChar(255)
+  inspection_status String? @db.VarChar(200)
+  remarks String? @db.MediumText
+  valuation_price Float?
+  ownership_name String? @db.VarChar(191)
+  video String? @db.MediumText
+  s3video_url String? @db.VarChar(255)
+  chassisphoto String? @db.MediumText
+  qc Int @default(0) @map("QC")
+  qc_checked_by String? @db.VarChar(100)
+  qc_datetime DateTime?
+  is_price_valuation Int @default(0) @db.TinyInt
+  price_valuation_by Int?
+  price_valuation_datetime DateTime?
+  ctime String @default("") @db.VarChar(20)
+  rating Int?
+  conditions String? @db.MediumText
+  date_of_registration DateTime? @db.Date
+  insurance String? @db.VarChar(20)
+  hpa_financier String? @db.VarChar(20)
+  battery String? @db.VarChar(20)
+  odometer String? @db.VarChar(20)
+  front_body String? @db.VarChar(20)
+  left_body String? @db.VarChar(20)
+  door String? @db.VarChar(20)
+  rear_body String? @db.VarChar(20)
+  right_body String? @db.VarChar(20)
+  body_condition String? @db.VarChar(20)
+  lt_side_gate String? @db.VarChar(20)
+  rt_side_gate String? @db.VarChar(20)
+  engine_condition String? @db.VarChar(20)
+  cubic_capacity String? @db.VarChar(20)
+  body_type String? @db.VarChar(20)
+  brake_system String? @db.VarChar(20)
+  front_rt String? @db.VarChar(20)
+  front_lt String? @db.VarChar(20)
+  rear_rt String? @db.VarChar(20)
+  rear_lt String? @db.VarChar(20)
+  spare_wheel String? @db.VarChar(50)
+  over_all String? @db.VarChar(20)
+  dashboard String? @db.VarChar(20)
+  transmission_type String? @db.VarChar(20)
+  seating_capacity String? @db.VarChar(20)
+  is_ac String? @db.VarChar(20)
+  air_bag String? @db.VarChar(20)
+  steering String? @db.VarChar(20)
+  sunroof String? @db.VarChar(50)
+  number_plate String? @db.VarChar(100)
+  vc_type String? @db.VarChar(50)
+  troly String? @db.VarChar(50)
+  paint String? @db.VarChar(50)
+  lift String? @db.VarChar(20)
+  start_condition String? @db.VarChar(30)
+  left_mudguard String? @db.VarChar(30)
+  right_mudguard String? @db.VarChar(30)
+  power String? @db.VarChar(30)
+  any_tyre_missing String? @db.VarChar(100)
+  seat_condition String? @db.VarChar(30)
+  gross_weight_kg String? @db.VarChar(30)
+  other_repair String? @db.VarChar(30)
+  inspect_by Int @default(0)
+  created_at DateTime?
+  updated_at DateTime?
+
+  @@map("tbl_valuation_4wheeler")
+}

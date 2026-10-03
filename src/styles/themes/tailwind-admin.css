@@ -1,0 +1,101 @@
+/* Tailwind-Admin (Modernize) — tokens from
+   github.com/Tailwind-Admin/free-tailwind-admin-dashboard-template (MIT). */
+
+[data-theme='tailwind-admin'] {
+  --radius: 0.625rem;
+
+  --primary: #5d87ff;
+  --secondary: #49beff;
+  --success: #13deb9;
+  --warning: #f6b51e;
+  --error: #ef4444;
+  --info-brand: #8754ec;
+  --dark: #1c2536;
+
+  --background: #ffffff;
+  --foreground: #2a3547;
+  --card: #ffffff;
+  --card-foreground: #2a3547;
+  --popover: #ffffff;
+  --popover-foreground: #2a3547;
+  --primary-foreground: #ffffff;
+  --secondary-foreground: #ffffff;
+  --muted: #f5f7fb;
+  --muted-foreground: #5a6a85;
+  --accent: color-mix(in oklab, var(--primary) 12%, transparent);
+  --accent-foreground: var(--primary);
+  --destructive: var(--error);
+  --destructive-foreground: #ffffff;
+  --border: #dfe5ef;
+  --input: #dfe5ef;
+  --ring: #5d87ff;
+
+  --chart-1: var(--primary);
+  --chart-2: var(--secondary);
+  --chart-3: var(--success);
+  --chart-4: var(--warning);
+  --chart-5: var(--error);
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #2a3547;
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: color-mix(in oklab, var(--primary) 12%, transparent);
+  --sidebar-accent-foreground: var(--primary);
+  --sidebar-border: #dfe5ef;
+  --sidebar-ring: #5d87ff;
+
+  /* Soft backgrounds used for pills, icon tiles and the welcome banner. */
+  --lightprimary: color-mix(in oklab, var(--primary) 12%, transparent);
+  --lightsecondary: color-mix(in oklab, var(--secondary) 12%, transparent);
+  --lightsuccess: color-mix(in oklab, var(--success) 12%, transparent);
+  --lightwarning: color-mix(in oklab, var(--warning) 14%, transparent);
+  --lighterror: color-mix(in oklab, var(--error) 12%, transparent);
+  --lightinfo: color-mix(in oklab, var(--info-brand) 12%, transparent);
+
+  /* Status text. The template's raw mint and amber are too pale to read as
+     small text on a light tint, so text uses a darkened mix of the same hue. */
+  --ok: color-mix(in oklab, var(--success) 55%, black);
+  --ok-soft: var(--lightsuccess);
+  --warn: color-mix(in oklab, var(--warning) 55%, black);
+  --warn-soft: var(--lightwarning);
+  --bad: color-mix(in oklab, var(--error) 72%, black);
+  --bad-soft: var(--lighterror);
+  --info: color-mix(in oklab, var(--primary) 68%, black);
+  --info-soft: var(--lightprimary);
+
+  --card-shadow: 0 1px 4px rgba(133, 146, 173, 0.2);
+}
+
+[data-theme='tailwind-admin'].dark {
+  --background: #1c2536;
+  --foreground: #eaeff4;
+  --card: #1c2536;
+  --card-foreground: #eaeff4;
+  --popover: #2a3851;
+  --popover-foreground: #eaeff4;
+  --muted: #2a3851;
+  --muted-foreground: #7c8fac;
+  --accent: color-mix(in oklab, var(--primary) 20%, transparent);
+  --border: #333f55;
+  --input: #333f55;
+
+  --sidebar: #1c2536;
+  --sidebar-foreground: #b6c2d6;
+  --sidebar-accent: color-mix(in oklab, var(--primary) 20%, transparent);
+  --sidebar-border: #333f55;
+
+  --lightprimary: color-mix(in oklab, var(--primary) 20%, transparent);
+  --lightsecondary: color-mix(in oklab, var(--secondary) 20%, transparent);
+  --lightsuccess: color-mix(in oklab, var(--success) 20%, transparent);
+  --lightwarning: color-mix(in oklab, var(--warning) 20%, transparent);
+  --lighterror: color-mix(in oklab, var(--error) 20%, transparent);
+  --lightinfo: color-mix(in oklab, var(--info-brand) 20%, transparent);
+
+  --ok: var(--success);
+  --warn: var(--warning);
+  --bad: color-mix(in oklab, var(--error) 80%, white);
+  --info: color-mix(in oklab, var(--primary) 75%, white);
+
+  --card-shadow: none;
+}

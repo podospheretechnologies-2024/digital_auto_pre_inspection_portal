@@ -1,0 +1,25 @@
+/* Individual theme files — each defines [data-theme='x'] for light and dark. */
+@import './themes/tailwind-admin.css';
+@import './themes/claude.css';
+@import './themes/discord.css';
+@import './themes/supabase.css';
+@import './themes/vercel.css';
+@import './themes/mono.css';
+@import './themes/notebook.css';
+@import './themes/light-green.css';
+@import './themes/zen.css';
+@import './themes/astro-vista.css';
+@import './themes/whatsapp.css';
+
+body {
+  @apply overscroll-none;
+}
+
+:root {
+  --header-height: calc(var(--spacing, 0.25rem) * 12 + 1px);
+}
+
+/* The upstream template also lets each theme swap the font family. We keep one
+   typeface (Geist, loaded via next/font in app/layout.tsx) so themes change
+   colour only — the font names the theme files declare are not loaded here and
+   would silently fall back to a system face. */

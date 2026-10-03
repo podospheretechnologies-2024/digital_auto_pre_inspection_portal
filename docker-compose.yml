@@ -1,0 +1,27 @@
+# Redis for BullMQ workers (Phase 7). MySQL stays on host / Laravel DB.
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+
+  # Optional local MinIO for PI file uploads (Phase 6)
+  minio:
+    image: minio/minio:latest
+    profiles: ["storage"]
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+
+volumes:
+  redis_data:
+  minio_data:

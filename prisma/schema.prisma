@@ -1,0 +1,1269 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model users {
+  id                Int       @id @default(autoincrement())
+  first_name        String    @db.VarChar(255)
+  last_name         String    @db.VarChar(255)
+  email             String    @unique(map: "users_email_unique") @db.VarChar(255)
+  email_verified_at DateTime? @db.Timestamp(0)
+  password          String    @db.VarChar(255)
+  remember_token    String?   @db.VarChar(100)
+  city_id           Int?
+  bank_id           Int?
+  type              String    @default("") @db.VarChar(50)
+  is_admin          Int       @default(0) @db.TinyInt
+  status            String?   @default("Active") @db.VarChar(50)
+  is_deleted        Int       @default(0) @db.TinyInt
+  verified_at       DateTime? @db.Timestamp(0)
+  last_activity     DateTime? @db.Timestamp(0)
+  is_online         Int       @default(0) @db.TinyInt
+  created_at        DateTime? @default(now()) @db.Timestamp(0)
+  updated_at        DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+
+  @@map("users")
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model menus {
+  id         Int
+  name       String?   @db.VarChar(50)
+  short_code String?   @db.VarChar(100)
+  module     String?   @db.VarChar(100)
+  created_at DateTime? @db.DateTime(0)
+  updated_at DateTime? @db.DateTime(0)
+  is_deleted Boolean   @default(false)
+
+  @@map("menus")
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model activity_log {
+  id           BigInt    @db.UnsignedBigInt
+  log_name     String?   @db.VarChar(255)
+  description  String    @db.Text
+  subject_type String?   @db.VarChar(255)
+  event        String?   @db.VarChar(255)
+  subject_id   BigInt?   @db.UnsignedBigInt
+  causer_type  String?   @db.VarChar(255)
+  causer_id    BigInt?   @db.UnsignedBigInt
+  properties   String?   @db.LongText
+  batch_uuid   String?   @db.Char(36)
+  created_at   DateTime? @db.Timestamp(0)
+  updated_at   DateTime? @db.Timestamp(0)
+
+  @@map("activity_log")
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model password_resets {
+  email      String    @db.VarChar(255)
+  token      String    @db.VarChar(255)
+  created_at DateTime? @db.Timestamp(0)
+
+  @@map("password_resets")
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model m_bank {
+  id             Int
+  name           String    @db.VarChar(250)
+  contact_person String    @db.VarChar(250)
+  phone          String    @db.VarChar(250)
+  emailid        String    @db.VarChar(250)
+  pincode        String    @db.VarChar(250)
+  ifsc           String    @db.VarChar(250)
+  created_at     DateTime? @db.Timestamp(0)
+  updated_at     DateTime? @db.Timestamp(0)
+
+  @@map("m_bank")
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model m_broker {
+  id         Int
+  name       String    @db.VarChar(200)
+  created_at DateTime? @db.DateTime(0)
+  updated_at DateTime? @db.DateTime(0)
+
+  @@map("m_broker")
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model m_city {
+  id         Int
+  name       String    @db.VarChar(250)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+
+  @@map("m_city")
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model m_company {
+  id         Int
+  name       String    @db.VarChar(200)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+
+  @@map("m_company")
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model m_model {
+  id         Int
+  company_id Int
+  name       String    @db.VarChar(250)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+
+  @@map("m_model")
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model m_variant {
+  id           Int
+  company_id   Int
+  model_id     Int
+  name         String    @db.VarChar(250)
+  vehicle_type String    @db.VarChar(100)
+  created_at   DateTime? @db.Timestamp(0)
+  updated_at   DateTime? @db.Timestamp(0)
+
+  @@map("m_variant")
+  @@ignore
+}
+
+/// Laravel `rc_details` — vehicle RC cache (Phase 4). Sparse vs full production DDL.
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model rc_details {
+  id                               Int
+  rc_blacklist_status              String?  @db.VarChar(255)
+  rc_body_type_desc                String?  @db.VarChar(255)
+  rc_chasi_no                      String?  @db.VarChar(255)
+  rc_color                         String?  @db.VarChar(255)
+  rc_cubic_cap                     String?  @db.VarChar(255)
+  rc_eng_no                        String?  @db.VarChar(255)
+  rc_f_name                        String?  @db.VarChar(255)
+  rc_financer                      String?  @db.VarChar(255)
+  rc_fit_upto                      String?  @db.VarChar(255)
+  rc_fuel_desc                     String?  @db.VarChar(255)
+  rc_gvw                           String?  @db.VarChar(255)
+  rc_insurance_type                String?  @db.VarChar(50)
+  rc_insurance_comp                String?  @db.VarChar(255)
+  rc_insurance_policy_no           String?  @db.VarChar(255)
+  rc_insurance_from                String?  @db.VarChar(50)
+  rc_insurance_upto                String?  @db.VarChar(255)
+  rc_maker_desc                    String?  @db.VarChar(255)
+  rc_maker_model                   String?  @db.VarChar(255)
+  rc_manu_month_yr                 String?  @db.VarChar(255)
+  rc_mobile_no                     String?  @db.VarChar(255)
+  rc_no_cyl                        String?  @db.VarChar(255)
+  rc_noc_date                      String?  @db.VarChar(255)
+  rc_noc_details                   String?  @db.VarChar(255)
+  rc_noc_to                        String?  @db.VarChar(255)
+  rc_norms_desc                    String?  @db.VarChar(255)
+  rc_owner_name                    String?  @db.VarChar(255)
+  rc_owner_sr                      String?  @db.VarChar(255)
+  rc_permanent_address             String?  @db.VarChar(255)
+  rc_permit_issue_dt               String?  @db.VarChar(255)
+  rc_permit_no                     String?  @db.VarChar(255)
+  rc_permit_type                   String?  @db.VarChar(255)
+  rc_permit_valid_from             String?  @db.VarChar(255)
+  rc_permit_valid_upto             String?  @db.VarChar(255)
+  rc_present_address               String?  @db.VarChar(255)
+  rc_pucc_no                       String?  @db.VarChar(255)
+  rc_pucc_from                     String?  @db.VarChar(50)
+  rc_pucc_upto                     String?  @db.VarChar(255)
+  rc_registered_at                 String?  @db.VarChar(255)
+  rc_regn_dt                       String?  @db.VarChar(255)
+  rc_regn_no                       String?  @db.VarChar(255)
+  rc_regn_valid_upto               String?  @db.VarChar(20)
+  rc_old_regn_no                   String?  @db.VarChar(25)
+  rc_rto_code                      String?  @db.VarChar(255)
+  rc_seat_cap                      String?  @db.VarChar(255)
+  rc_sleeper_cap                   String?  @db.VarChar(255)
+  rc_stand_cap                     String?  @db.VarChar(255)
+  rc_status                        String?  @db.VarChar(255)
+  rc_status_as_on                  String?  @db.VarChar(255)
+  rc_tax_type                      String?  @db.VarChar(50)
+  rc_tax_amount                    String?  @db.VarChar(255)
+  rc_tax_paid_date                 String?  @db.VarChar(255)
+  rc_tax_upto                      String?  @db.VarChar(255)
+  rc_unld_wt                       String?  @db.VarChar(255)
+  rc_vch_catg                      String?  @db.VarChar(255)
+  rc_vh_class_desc                 String?  @db.VarChar(255)
+  rc_wheelbase                     String?  @db.VarChar(255)
+  state_cd                         String?  @db.VarChar(255)
+  rc_purchase_dt                   String?  @db.Text
+  rto_cd                           String?  @db.Text
+  rc_ncrb_status                   String?  @db.Text
+  rc_vh_type                       String?  @db.Text
+  rc_vh_class                      String?  @db.Text
+  rc_noc_dt                        String?  @db.Text
+  rc_fuel_cd                       String?  @db.Text
+  rc_maker_cd                      String?  @db.Text
+  rc_model_cd                      String?  @db.Text
+  rc_norms_cd                      String?  @db.Text
+  rc_sale_amt                      String?  @db.Text
+  rc_own_catg_desc                 String?  @db.Text
+  rc_vch_catg_desc                 String?  @db.Text
+  rc_owner_cd_desc                 String?  @db.Text
+  rc_vehicle_surrendered_to_dealer String?  @db.Text
+  rc_currentadd_districtcode       String?  @db.Text
+  rc_non_use                       String?  @db.Text
+  rc_passenger_tax                 String?  @db.Text
+  rc_goods_tax                     String?  @db.Text
+  rc_no_of_axle                    String?  @db.Text
+  rc_aitp_upto                     String?  @db.Text
+  rc_aitp_no                       String?  @db.Text
+  rc_qr_url                        String?  @db.Text
+  rc_auth_name                     String?  @db.Text
+  rc_auth_sign                     String?  @db.Text
+  rc_approval_date                 String?  @db.Text
+  rc_hp                            String?  @db.Text
+  rc_mandal_desc                   String?  @db.Text
+  rc_taluk_cd                      String?  @db.Text
+  rc_tax_mode                      String?  @db.Text
+  rc_width                         String?  @db.Text
+  rc_fitness_result                String?  @db.Text
+  rc_aitp_pmt_upto                 String?  @db.Text
+  rc_aitp_pmt_no                   String?  @db.Text
+  rc_non_use_from                  String?  @db.Text
+  rc_non_use_upto                  String?  @db.Text
+  rc_hsrp_affixed                  String?  @db.Text
+  rc_hsrp_no_front                 String?  @db.Text
+  rc_hsrp_no_back                  String?  @db.Text
+  rc_gcw                           String?  @db.Text
+  rc_floor_area                    String?  @db.Text
+  rc_length                        String?  @db.Text
+  rc_height                        String?  @db.Text
+  rc_permit_service_type           String?  @db.Text
+  rc_counter_sign_upto             String?  @db.Text
+  rc_fitness_rqrd_for              String?  @db.Text
+  rc_fit_valid_to                  String?  @db.Text
+  crn                              String?  @db.VarChar(255)
+  status                           String?  @db.VarChar(255)
+  request_timestamp                String?  @db.VarChar(255)
+  response_timestamp               String?  @db.VarChar(255)
+  total_time                       String?  @db.VarChar(255)
+  MESSAGE                          String?  @db.VarChar(255)
+  ERROR                            String?  @db.VarChar(255)
+  DigitalNo                        String?  @db.VarChar(255)
+  rc_api_user_id                   Int?
+  api_request_id                   String?  @db.VarChar(100)
+  api_request_status               String?  @db.VarChar(50)
+  created_at                       DateTime @default(now()) @db.Timestamp(0)
+  updated_at                       DateTime @default(now()) @updatedAt @db.Timestamp(0)
+  is_deleted                       Int      @default(0) @db.TinyInt
+
+  @@index([rc_regn_no], map: "idx_regn")
+  @@map("rc_details")
+  @@ignore
+}
+
+/// Laravel `rc_api_users` — access_token = uuid for public vehicle-rc API.
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model rc_api_users {
+  id         Int
+  name       String?   @db.VarChar(255)
+  company    String?   @db.VarChar(255)
+  email      String?   @db.VarChar(255)
+  mobile     String?   @db.VarChar(255)
+  address    String?   @db.VarChar(255)
+  city       String?   @db.VarChar(255)
+  state      String?   @db.VarChar(255)
+  zip        String?   @db.VarChar(25)
+  uuid       String?   @db.VarChar(255)
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  updated_at DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  is_deleted Int       @default(0) @db.TinyInt
+
+  @@map("rc_api_users")
+  @@ignore
+}
+
+/// Laravel `rc_api_requests` — audit / rate-limit counter for vehicle-rc.
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model rc_api_requests {
+  id             BigInt
+  rc_api_user_id Int?
+  rc_detail_id   Int?
+  rc_regn_no     String?   @db.VarChar(255)
+  status         String?   @db.VarChar(255)
+  message        String?   @db.VarChar(255)
+  access_token   String?   @db.VarChar(255)
+  created_at     DateTime? @default(now()) @db.Timestamp(0)
+  updated_at     DateTime  @default(now()) @updatedAt @db.Timestamp(0)
+
+  @@map("rc_api_requests")
+  @@ignore
+}
+
+/// Financial year sessions used when generating DTI numbers (Laravel fin_year).
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model fin_year {
+  id       Int
+  fsession String   @db.VarChar(100)
+  ffrom    DateTime @db.Date
+  fto      DateTime @db.Date
+
+  @@map("fin_year")
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model confiscated_auction_details {
+  id              Int
+  Registration_No String?   @db.VarChar(20)
+  full_row_json   String?   @db.LongText
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model failed_jobs {
+  id         BigInt   @db.UnsignedBigInt
+  uuid       String   @db.VarChar(255)
+  connection String   @db.Text
+  queue      String   @db.Text
+  payload    String   @db.LongText
+  exception  String   @db.LongText
+  failed_at  DateTime @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_38a {
+  id              Int
+  Registration_No String?   @db.VarChar(20)
+  full_row_json   String?   @db.LongText
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_address_changes {
+  id              Int
+  Registration_No String?   @db.VarChar(20)
+  Application_No  String?   @db.VarChar(100)
+  Address_From    String?   @db.Text
+  Address_To      String?   @db.Text
+  Office          String?   @db.VarChar(255)
+  Changed_On      String?   @db.VarChar(100)
+  full_row_json   String?   @db.LongText
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_alterations {
+  id              Int
+  Registration_No String?   @db.VarChar(20)
+  Application_No  String?   @db.VarChar(100)
+  Alteration_Type String?   @db.VarChar(100)
+  Details         String?   @db.Text
+  Office          String?   @db.VarChar(255)
+  Operation_Date  String?   @db.VarChar(100)
+  full_row_json   String?   @db.LongText
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_blacklists {
+  id                   Int
+  Registration_No      String?
+  Complain_File_Number String?   @db.VarChar(500)
+  Complain_Date        String?
+  Complain_Entered_By  String?
+  Action_Taken         String?
+  Action_Entered_By    String?
+  Action_Date          String?
+  Office               String?
+  Compounding_Amount   String?
+  pulled_at            DateTime? @db.Timestamp(0)
+  created_at           DateTime  @default(now()) @db.Timestamp(0)
+  updated_at           DateTime  @default(now()) @db.Timestamp(0)
+
+  @@index([Registration_No], map: "idx_reg")
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_challans {
+  id                     Int
+  Registration_No        String?   @db.VarChar(255)
+  Serial_No              Int?
+  Challan_No             String?   @db.VarChar(255)
+  Offense_Details        String?   @db.Text
+  Challan_Place          String?   @db.VarChar(255)
+  Challan_Date_Time      String?   @db.VarChar(255)
+  State                  String?   @db.VarChar(255)
+  RTO                    String?   @db.VarChar(255)
+  Accused_Name           String?   @db.VarChar(255)
+  Amount                 String?   @db.VarChar(255)
+  Challan_Status         String?   @db.VarChar(255)
+  Payment_Source         String?   @db.VarChar(255)
+  Payment_Date           String?   @db.VarChar(255)
+  Receipt_Number         String?   @db.VarChar(255)
+  sent_to_reg_court      String?   @db.VarChar(255)
+  remark                 String?   @db.Text
+  dl_no                  String?   @db.VarChar(255)
+  driver_name            String?   @db.VarChar(255)
+  owner_name             String?   @db.VarChar(255)
+  department             String?   @db.VarChar(255)
+  document_impounded     String?   @db.VarChar(255)
+  amount_of_fine_imposed String?   @db.VarChar(255)
+  court_address          String?   @db.VarChar(255)
+  court_name             String?   @db.VarChar(255)
+  date_of_proceeding     String?   @db.VarChar(255)
+  sent_to_court_on       String?   @db.VarChar(255)
+  sent_to_virtual_court  String?   @db.VarChar(255)
+  rto_distric_name       String?   @db.VarChar(255)
+  pulled_at              DateTime? @db.Timestamp(0)
+  created_at             DateTime  @default(now()) @db.Timestamp(0)
+  updated_at             DateTime  @default(now()) @db.Timestamp(0)
+
+  @@index([Registration_No], map: "idx_reg")
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_changed_vehicle_record_by_admins {
+  id              Int
+  Registration_No String?
+  Sr_No           String?
+  Changed_By      String?
+  Changed_Data    String?   @db.Text
+  Changed_On      String?
+  Office          String?
+  pulled_at       DateTime? @db.Timestamp(0)
+  created_at      DateTime  @default(now()) @db.Timestamp(0)
+  updated_at      DateTime  @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_changed_vehicle_records {
+  id              Int
+  Registration_No String?  @db.VarChar(50)
+  Sr_No           String?  @db.VarChar(50)
+  Changed_By      String?  @db.VarChar(255)
+  Changed_Data    String?  @db.Text
+  Changed_On      String?  @db.VarChar(255)
+  Office          String?  @db.VarChar(255)
+  created_at      DateTime @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_cods {
+  id              Int
+  Registration_No String?   @db.VarChar(20)
+  COD_No          String?   @db.VarChar(100)
+  Deposit_Date    String?   @db.VarChar(100)
+  Reason          String?   @db.Text
+  Office          String?   @db.VarChar(255)
+  full_row_json   String?   @db.LongText
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_conversions {
+  id              Int
+  Registration_No String?   @db.VarChar(20)
+  Application_No  String?   @db.VarChar(100)
+  From_Class      String?   @db.VarChar(100)
+  To_Class        String?   @db.VarChar(100)
+  Office          String?   @db.VarChar(255)
+  Operation_Date  String?   @db.VarChar(100)
+  full_row_json   String?   @db.LongText
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_dispatch_rc {
+  id              Int
+  Registration_No String?   @db.VarChar(20)
+  full_row_json   String?   @db.LongText
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_duplicate_rcs {
+  id              Int
+  Registration_No String?   @db.VarChar(20)
+  Application_No  String?   @db.VarChar(100)
+  Reason          String?   @db.Text
+  Printed_On      String?   @db.VarChar(100)
+  Office          String?   @db.VarChar(255)
+  full_row_json   String?   @db.LongText
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_fancy_fees {
+  id              Int
+  Registration_No String?   @db.VarChar(20)
+  full_row_json   String?   @db.LongText
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_fitness {
+  id                    Int
+  Registration_No       String?   @db.VarChar(50)
+  Appl_No               String?   @db.VarChar(100)
+  Fitness_Check_Date    String?   @db.VarChar(255)
+  Result                String?   @db.VarChar(50)
+  Fitness_UPTO          String?   @db.VarChar(255)
+  NID                   String?   @db.VarChar(100)
+  Operation_Date        String?   @db.VarChar(255)
+  Fitness_Officer_Name1 String?   @db.VarChar(255)
+  Fitness_Officer_Name2 String?   @db.VarChar(255)
+  Office                String?   @db.VarChar(255)
+  Remark                String?   @db.Text
+  pulled_at             DateTime? @db.Timestamp(0)
+  created_at            DateTime  @default(now()) @db.Timestamp(0)
+
+  @@index([Registration_No], map: "idx_reg")
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_fitnesses {
+  id                    Int
+  Registration_No       String?
+  Application_No        String?
+  Fitness_Check_Date    String?
+  Result                String?
+  Fitness_Upto          String?
+  NID                   String?
+  Operation_Date        String?
+  Fitness_Officer_Name1 String?
+  Fitness_Officer_Name2 String?
+  Office                String?
+  Remark                String?
+  pulled_at             DateTime? @db.Timestamp(0)
+  created_at            DateTime  @default(now()) @db.Timestamp(0)
+  updated_at            DateTime  @default(now()) @db.Timestamp(0)
+
+  @@index([Registration_No], map: "idx_reg")
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_hsrps {
+  id              Int
+  Registration_No String?   @db.VarChar(20)
+  Application_No  String?   @db.VarChar(100)
+  HSRP_Number     String?   @db.VarChar(100)
+  Fixing_Date     String?   @db.VarChar(100)
+  Office          String?   @db.VarChar(255)
+  full_row_json   String?   @db.LongText
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_hypothecation_terminations {
+  id              Int
+  Registration_No String?   @db.VarChar(20)
+  full_row_json   String?   @db.LongText
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_hypothecations {
+  id                 Int
+  Registration_No    String?   @db.VarChar(255)
+  Application_No     String?   @db.VarChar(255)
+  Hypothecation_Type String?   @db.VarChar(255)
+  Financer_Name      String?   @db.VarChar(255)
+  Financer_Address   String?   @db.VarChar(255)
+  From_Date          String?   @db.VarChar(255)
+  To_Date            String?   @db.VarChar(255)
+  Termination_Date   String?   @db.VarChar(255)
+  Office             String?   @db.VarChar(255)
+  pulled_at          DateTime? @db.Timestamp(0)
+  created_at         DateTime  @default(now()) @db.Timestamp(0)
+  updated_at         DateTime  @default(now()) @db.Timestamp(0)
+
+  @@index([Registration_No], map: "idx_reg")
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_insurances {
+  id                Int
+  Registration_No   String?   @db.VarChar(255)
+  Sr_No             Int?
+  Insurance_Company String?   @db.VarChar(255)
+  Insurance_Type    String?   @db.VarChar(255)
+  Insurance_From    String?   @db.VarChar(255)
+  Insurance_Upto    String?   @db.VarChar(255)
+  Cover_Note_No     String?   @db.VarChar(255)
+  Office            String?   @db.VarChar(255)
+  pulled_at         DateTime? @db.Timestamp(0)
+  created_at        DateTime  @default(now()) @db.Timestamp(0)
+  updated_at        DateTime  @default(now()) @db.Timestamp(0)
+
+  @@index([Registration_No], map: "idx_reg")
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_mobile_number_updations {
+  id              Int
+  Registration_No String?   @db.VarChar(20)
+  full_row_json   String?   @db.LongText
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_noc {
+  id              Int
+  Registration_No String?   @db.VarChar(255)
+  Application_No  String?   @db.VarChar(255)
+  NOC_No          String?   @db.VarChar(255)
+  NOC_Date        String?   @db.VarChar(255)
+  State_To        String?   @db.VarChar(255)
+  Office_To       String?   @db.VarChar(255)
+  Dispatch_No     String?   @db.VarChar(255)
+  New_Owner       String?   @db.VarChar(255)
+  Office          String?   @db.VarChar(255)
+  pulled_at       DateTime? @db.Timestamp(0)
+  created_at      DateTime  @default(now()) @db.Timestamp(0)
+  updated_at      DateTime  @default(now()) @db.Timestamp(0)
+
+  @@index([Registration_No], map: "idx_reg")
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_noc_cancelled {
+  id              Int
+  Registration_No String?   @db.VarChar(20)
+  full_row_json   String?   @db.LongText
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_np_authorisations {
+  id               Int
+  Registration_No  String?   @db.VarChar(20)
+  Authorisation_No String?   @db.VarChar(100)
+  Valid_From       String?   @db.VarChar(100)
+  Valid_Upto       String?   @db.VarChar(100)
+  Office           String?   @db.VarChar(255)
+  full_row_json    String?   @db.LongText
+  created_at       DateTime? @default(now()) @db.Timestamp(0)
+  updated_at       DateTime? @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_paid_fees {
+  id               Int
+  Registration_No  String?   @db.VarChar(255)
+  Receipt_No       String?   @db.VarChar(255)
+  Receipt_Date     String?   @db.VarChar(255)
+  Fee_Amount       String?   @db.VarChar(255)
+  Fine             String?   @db.VarChar(255)
+  Fee_Particular   String?   @db.VarChar(255)
+  Office           String?   @db.VarChar(255)
+  GRN_No           String?   @db.VarChar(255)
+  Fee_Collected_As String?   @db.VarChar(255)
+  collection_mode  String?   @db.VarChar(255)
+  pulled_at        DateTime? @db.Timestamp(0)
+  created_at       DateTime  @default(now()) @db.Timestamp(0)
+  updated_at       DateTime  @default(now()) @db.Timestamp(0)
+  Sr_No            String?   @db.Text
+  Application_No   String?   @db.Text
+
+  @@index([Registration_No], map: "idx_reg")
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_permit_transactions {
+  id              Int
+  Registration_No String?   @db.VarChar(20)
+  full_row_json   String?   @db.LongText
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_permits {
+  id              Int
+  Registration_No String?
+  Application_No  String?
+  Permit_No       String?
+  Issue_Date      String?
+  Valid_From      String?
+  Valid_Upto      String?
+  Permit_Type     String?
+  Permit_Category String?
+  Office          String?
+  pulled_at       DateTime? @db.Timestamp(0)
+  created_at      DateTime  @default(now()) @db.Timestamp(0)
+  updated_at      DateTime  @default(now()) @db.Timestamp(0)
+
+  @@index([Registration_No], map: "idx_reg")
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_puccs {
+  id              Int
+  Registration_No String?   @db.VarChar(20)
+  PUCC_No         String?   @db.VarChar(100)
+  PUCC_Upto       String?   @db.VarChar(100)
+  Result          String?   @db.VarChar(50)
+  Office          String?   @db.VarChar(255)
+  full_row_json   String?   @db.LongText
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_rc_cancel {
+  id              Int
+  Registration_No String?   @db.VarChar(20)
+  full_row_json   String?   @db.LongText
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_rc_print_details {
+  id              Int
+  Registration_No String?
+  Application_No  String?
+  Purpose         String?
+  Printed_On      String?
+  Printed_By      String?
+  pulled_at       DateTime? @db.Timestamp(0)
+  created_at      DateTime  @default(now()) @db.Timestamp(0)
+  updated_at      DateTime  @default(now()) @db.Timestamp(0)
+
+  @@index([Registration_No], map: "idx_reg")
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_rc_surrender {
+  id              Int
+  Registration_No String?   @db.VarChar(20)
+  full_row_json   String?   @db.LongText
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_rc_suspend {
+  id              Int
+  Registration_No String?   @db.VarChar(20)
+  full_row_json   String?   @db.LongText
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_reassignments {
+  id                  Int
+  Registration_No     String?   @db.VarChar(20)
+  Application_No      String?   @db.VarChar(100)
+  Old_Registration_No String?   @db.VarChar(50)
+  New_Registration_No String?   @db.VarChar(50)
+  Office              String?   @db.VarChar(255)
+  Operation_Date      String?   @db.VarChar(100)
+  full_row_json       String?   @db.LongText
+  created_at          DateTime? @default(now()) @db.Timestamp(0)
+  updated_at          DateTime? @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_renewals {
+  id              Int
+  Registration_No String?   @db.VarChar(20)
+  Application_No  String?   @db.VarChar(100)
+  Renewed_Upto    String?   @db.VarChar(100)
+  Office          String?   @db.VarChar(255)
+  Operation_Date  String?   @db.VarChar(100)
+  full_row_json   String?   @db.LongText
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_road_taxes {
+  id              Int
+  Registration_No String?   @db.VarChar(255)
+  Receipt_No      String?   @db.VarChar(255)
+  Tax_From        String?   @db.VarChar(255)
+  Tax_Upto        String?   @db.VarChar(255)
+  Tax_Type        String?   @db.VarChar(255)
+  Challan_Date    String?   @db.VarChar(255)
+  Total_Amount    String?   @db.VarChar(255)
+  Office          String?   @db.VarChar(255)
+  Tax             String?   @db.VarChar(255)
+  Penalty         String?   @db.VarChar(255)
+  GRN_No          String?   @db.VarChar(255)
+  Breakup         String?   @db.VarChar(255)
+  Tax_Mode        String?   @db.VarChar(255)
+  collection_mode String?   @db.VarChar(255)
+  pulled_at       DateTime? @db.Timestamp(0)
+  created_at      DateTime  @default(now()) @db.Timestamp(0)
+  updated_at      DateTime  @default(now()) @db.Timestamp(0)
+  Sr_No           String?   @db.Text
+  Application_No  String?   @db.Text
+
+  @@index([Registration_No], map: "idx_reg")
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_slds {
+  id              Int
+  Registration_No String?   @db.VarChar(20)
+  Application_No  String?   @db.VarChar(100)
+  SLD_Number      String?   @db.VarChar(100)
+  Fitment_Date    String?   @db.VarChar(100)
+  Office          String?   @db.VarChar(255)
+  full_row_json   String?   @db.LongText
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_swapping_retentions {
+  id              Int
+  Registration_No String?   @db.VarChar(20)
+  full_row_json   String?   @db.LongText
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_tax_clears {
+  id              Int
+  Registration_No String?
+  Sr_No           String?
+  Tax_Description String?
+  Tax_Clear_To    String?
+  TCR_No          String?
+  Operation_Date  String?
+  Remarks         String?
+  Office          String?
+  pulled_at       DateTime? @db.Timestamp(0)
+  created_at      DateTime  @default(now()) @db.Timestamp(0)
+  updated_at      DateTime  @default(now()) @db.Timestamp(0)
+
+  @@index([Registration_No], map: "idx_reg")
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_tax_exemptions {
+  id              Int
+  Registration_No String?   @db.VarChar(20)
+  full_row_json   String?   @db.LongText
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_tax_installments {
+  id              Int
+  Registration_No String?   @db.VarChar(20)
+  full_row_json   String?   @db.LongText
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_tax_refunds {
+  id              Int
+  Registration_No String?   @db.VarChar(20)
+  full_row_json   String?   @db.LongText
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_temporary_permits {
+  id              Int
+  Registration_No String?   @db.VarChar(20)
+  full_row_json   String?   @db.LongText
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_transfer_ownerships {
+  id                        Int
+  Registration_No           String?   @db.VarChar(255)
+  Application_No            String?   @db.VarChar(255)
+  Ownership_Serial          Int?
+  Owner_From                String?   @db.VarChar(255)
+  Owner_Upto                String?   @db.VarChar(255)
+  Owner_Name                String?   @db.VarChar(255)
+  Father_Husband_Name       String?   @db.VarChar(255)
+  Present_Address           String?   @db.VarChar(255)
+  Permanent_Address         String?   @db.VarChar(255)
+  Owner_Type                String?   @db.VarChar(255)
+  Sale_Auction_Date         String?   @db.VarChar(255)
+  Sale_Amount               String?   @db.VarChar(255)
+  Reason                    String?   @db.VarChar(255)
+  Office                    String?   @db.VarChar(255)
+  Deemed_Transfer_Time_Days Int?
+  pulled_at                 DateTime? @db.Timestamp(0)
+  created_at                DateTime  @default(now()) @db.Timestamp(0)
+  updated_at                DateTime  @default(now()) @db.Timestamp(0)
+
+  @@index([Registration_No], map: "idx_reg")
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_of_vehicle_nonuse {
+  id              Int
+  Registration_No String?   @db.VarChar(20)
+  full_row_json   String?   @db.LongText
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_pre_inspection_modules {
+  id         Int
+  user_id    Int?
+  job_id     Int?
+  event      String?
+  remark     String?   @db.Text
+  created_at DateTime? @db.DateTime(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model history_valuation_modules {
+  id         Int
+  user_id    Int?
+  job_id     Int?
+  event      String?
+  remark     String?   @db.Text
+  created_at DateTime? @db.DateTime(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model migrations {
+  id        Int    @db.UnsignedInt
+  migration String @db.VarChar(255)
+  batch     Int
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model model_has_permissions {
+  permission_id BigInt @db.UnsignedBigInt
+  model_type    String @db.VarChar(255)
+  model_id      BigInt @db.UnsignedBigInt
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model model_has_roles {
+  role_id    BigInt @db.UnsignedBigInt
+  model_type String @db.VarChar(255)
+  model_id   BigInt @db.UnsignedBigInt
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model oauth_access_tokens {
+  id         String    @db.Char(80)
+  user_id    BigInt?   @db.UnsignedBigInt
+  client_id  String    @db.Char(36)
+  name       String?   @db.VarChar(255)
+  scopes     String?   @db.Text
+  revoked    Boolean
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+  expires_at DateTime? @db.DateTime(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model oauth_auth_codes {
+  id         String    @db.Char(80)
+  user_id    BigInt    @db.UnsignedBigInt
+  client_id  String    @db.Char(36)
+  scopes     String?   @db.Text
+  revoked    Boolean
+  expires_at DateTime? @db.DateTime(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model oauth_clients {
+  id            String    @db.Char(36)
+  owner_type    String?   @db.VarChar(255)
+  owner_id      BigInt?   @db.UnsignedBigInt
+  name          String    @db.VarChar(255)
+  secret        String?   @db.VarChar(255)
+  provider      String?   @db.VarChar(255)
+  redirect_uris String    @db.Text
+  grant_types   String    @db.Text
+  revoked       Boolean
+  created_at    DateTime? @db.Timestamp(0)
+  updated_at    DateTime? @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model oauth_device_codes {
+  id               String    @db.Char(80)
+  user_id          BigInt?   @db.UnsignedBigInt
+  client_id        String    @db.Char(36)
+  user_code        String    @db.Char(8)
+  scopes           String    @db.Text
+  revoked          Boolean
+  user_approved_at DateTime? @db.DateTime(0)
+  last_polled_at   DateTime? @db.DateTime(0)
+  expires_at       DateTime? @db.DateTime(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model oauth_refresh_tokens {
+  id              String    @db.Char(80)
+  access_token_id String    @db.Char(80)
+  revoked         Boolean
+  expires_at      DateTime? @db.DateTime(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model old_registration_numbers {
+  id                  Int
+  vehicle_id          Int?
+  vehicle_no          String    @db.VarChar(20)
+  old_registration_no String    @db.VarChar(50)
+  captured_at         DateTime? @default(now()) @db.Timestamp(0)
+  old_rto_code        String?   @db.VarChar(20)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model permissions {
+  id         BigInt    @db.UnsignedBigInt
+  name       String    @db.VarChar(255)
+  guard_name String    @db.VarChar(255)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model remote_activity_logs {
+  id            BigInt
+  machine_label String    @db.VarChar(100)
+  worker_id     String    @db.VarChar(50)
+  source        String    @default("automation") @db.VarChar(20)
+  message       String    @db.Text
+  logged_at     DateTime? @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model role_has_permissions {
+  permission_id BigInt @db.UnsignedBigInt
+  role_id       BigInt @db.UnsignedBigInt
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model roles {
+  id         BigInt    @db.UnsignedBigInt
+  name       String    @db.VarChar(255)
+  guard_name String    @db.VarChar(255)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model search_vrn_to_mobile_numbers {
+  id                          Int
+  vehicle_registration_number String   @db.VarChar(20)
+  status                      String   @default("Pending") @db.VarChar(20)
+  created_at                  DateTime @default(now()) @db.Timestamp(0)
+  updated_at                  DateTime @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model sessions {
+  id            String  @db.VarChar(255)
+  user_id       BigInt? @db.UnsignedBigInt
+  ip_address    String? @db.VarChar(45)
+  user_agent    String? @db.Text
+  payload       String  @db.LongText
+  last_activity Int
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model settings {
+  id      Int     @db.UnsignedInt
+  key     String  @db.VarChar(255)
+  value   String  @db.Text
+  user_id BigInt? @db.UnsignedBigInt
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model sms_history_details {
+  id              Int
+  Registration_No String?   @db.VarChar(20)
+  full_row_json   String?   @db.LongText
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @db.Timestamp(0)
+
+  @@ignore
+}
+
+model vehicles {
+  id                  Int              @id @default(autoincrement())
+  vehicle_no          String           @unique(map: "uk_vehicle_no") @db.VarChar(20)
+  queue_order         Int?
+  owner_name          String?          @db.VarChar(255)
+  registration_date   String?          @db.VarChar(50)
+  chassis_no          String?          @db.VarChar(100)
+  engine_no           String?          @db.VarChar(100)
+  vehicle_class       String?          @db.VarChar(100)
+  fuel_type           String?          @db.VarChar(50)
+  fitness_upto        String?          @db.VarChar(50)
+  insurance_upto      String?          @db.VarChar(50)
+  pucc_upto           String?          @db.VarChar(50)
+  mv_tax_upto         String?          @db.VarChar(50)
+  maker_model         String?          @db.VarChar(255)
+  full_data           String?          @db.LongText
+  status              vehicles_status? @default(Pending)
+  last_updated        DateTime?        @default(now()) @db.Timestamp(0)
+  mobile_no           String?          @db.Text
+  queue_hidden        Boolean          @default(false)
+  processing_instance String?          @db.Text
+  father_name         String?          @db.VarChar(255)
+  created_at          DateTime?        @default(now()) @db.Timestamp(0)
+}
+
+enum vehicles_status {
+  Pending
+  Processing
+  Completed
+  Error
+  No_Data    @map("No Data")
+}
