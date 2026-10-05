@@ -63,6 +63,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ data }, { status: 201 });
   } catch (error) {
     console.error("[api/v2/jobs POST]", error);
-    return NextResponse.json({ message: "Create failed" }, { status: 500 });
+    const message =
+      error instanceof Error && /column|does not exist|P2022/i.test(error.message)
+        ? "Create failed (database schema mismatch). Check server logs."
+        : error instanceof Error
+          ? error.message
+          : "Create failed";
+    return NextResponse.json({ message }, { status: 500 });
   }
 }

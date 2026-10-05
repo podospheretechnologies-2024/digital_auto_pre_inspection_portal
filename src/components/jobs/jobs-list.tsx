@@ -1,30 +1,29 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { Eye, Search } from "lucide-react";
 import { useState } from "react";
 
-import { JobsNav } from "@/components/jobs/jobs-nav";
 import { RegPlate } from "@/components/atlas/reg-plate";
 import { jobStatusPill, StatusPill } from "@/components/atlas/status-pill";
-import { PageHeader } from "@/components/layout/page-header";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { LinkButton } from "@/components/ui/link-button";
-import {
-  Table,
+  JobActionButton,
+  JobActionLink,
+  JobActions,
+  JobDtiCell,
+  JobSerialCell,
+  JobSerialHead,
+  JobsListingCard,
+  JobsTable,
+  JobsTableCell,
+  JobsTableHead,
+  JobsTableHeader,
+  JobsTableRow,
   TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+} from "@/components/jobs/jobs-listing";
+import { JobsNav } from "@/components/jobs/jobs-nav";
+import { PageHeader } from "@/components/layout/page-header";
+import { Input } from "@/components/ui/input";
 import { inspectPathForJob } from "@/lib/jobs/helpers";
 
 type JobRow = {
@@ -57,24 +56,29 @@ export function JobsListPage() {
     },
   });
 
+  const rows = listQuery.data ?? [];
+
   return (
     <>
       <PageHeader
         title="Pre-Inspection"
-        description="Intimation → assign → inspect → QC → complete · Valuation & FI out of scope"
+        description="Manage intimations through assign, inspect, QC and completion."
+        eyebrow="Jobs"
       />
       <JobsNav active="/jobs" />
 
-      <Card>
-        <CardHeader className="flex flex-row flex-wrap items-end justify-between gap-3">
-          <div>
-            <CardTitle>All jobs</CardTitle>
-            <CardDescription>
-              Search by DTI, vehicle, customer or bank reference
-            </CardDescription>
-          </div>
+      <JobsListingCard
+        title="All jobs"
+        description="Search by DTI, vehicle, customer or bank reference"
+        count={rows.length}
+        loading={listQuery.isLoading}
+        error={
+          listQuery.isError ? (listQuery.error as Error).message : null
+        }
+        empty="No jobs found"
+        toolbar={
           <form
-            className="flex gap-2"
+            className="flex items-center gap-2"
             onSubmit={(e) => {
               e.preventDefault();
               setSearch(q.trim());
@@ -84,101 +88,88 @@ export function JobsListPage() {
               placeholder="Search…"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              className="w-48"
+              className="h-8 w-48 text-[13px]"
             />
-            <Button type="submit" variant="outline" size="sm">
-              Go
-            </Button>
+            <JobActionButton type="submit" tone="outline" icon={Search} label="Search" />
           </form>
-        </CardHeader>
-        <CardContent>
-          {listQuery.isLoading ? (
-            <p className="text-sm text-muted-foreground">Loading jobs…</p>
-          ) : listQuery.isError ? (
-            <p className="text-sm text-destructive">
-              {(listQuery.error as Error).message}
-            </p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>DTI</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Vehicle</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Bank</TableHead>
-                  <TableHead>Agent</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(listQuery.data ?? []).length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={9}
-                      className="text-center text-muted-foreground"
+        }
+      >
+        {rows.length > 0 ? (
+          <JobsTable>
+            <JobsTableHeader>
+              <JobsTableRow>
+                <JobSerialHead />
+                <JobsTableHead>ID</JobsTableHead>
+                <JobsTableHead>DTI</JobsTableHead>
+                <JobsTableHead>Customer</JobsTableHead>
+                <JobsTableHead>Vehicle</JobsTableHead>
+                <JobsTableHead>Type</JobsTableHead>
+                <JobsTableHead>Bank</JobsTableHead>
+                <JobsTableHead>Agent</JobsTableHead>
+                <JobsTableHead>Status</JobsTableHead>
+                <JobsTableHead className="text-right">Actions</JobsTableHead>
+              </JobsTableRow>
+            </JobsTableHeader>
+            <TableBody>
+              {rows.map((job, index) => {
+                const pill = jobStatusPill(job.status);
+                return (
+                  <JobsTableRow key={job.id}>
+                    <JobSerialCell index={index} />
+                    <JobsTableCell className="font-mono text-[12px] text-muted-foreground">
+                      #{job.id}
+                    </JobsTableCell>
+                    <JobsTableCell>
+                      <JobDtiCell value={job.dti_no} />
+                    </JobsTableCell>
+                    <JobsTableCell
+                      className="max-w-[160px] truncate font-medium"
+                      title={job.cname ?? undefined}
                     >
-                      No jobs found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  (listQuery.data ?? []).map((job) => (
-                    <TableRow key={job.id}>
-                      <TableCell className="font-mono text-[12.5px] text-muted-foreground">
-                        #{job.id}
-                      </TableCell>
-                      <TableCell>{job.dti_no ?? "—"}</TableCell>
-                      <TableCell
-                        className="max-w-[180px] truncate"
-                        title={job.cname ?? undefined}
-                      >
-                        {job.cname ?? "—"}
-                      </TableCell>
-                      <TableCell>
-                        <RegPlate value={job.vehicleno} />
-                      </TableCell>
-                      <TableCell>{job.vehicle_type ?? "—"}</TableCell>
-                      <TableCell
-                        className="max-w-[200px] truncate text-muted-foreground"
-                        title={job.bankname ?? undefined}
-                      >
-                        {job.bankname ?? job.bank_id ?? "—"}
-                      </TableCell>
-                      <TableCell
-                        className="max-w-[150px] truncate"
-                        title={job.agent_name ?? undefined}
-                      >
-                        {job.agent_name ?? job.agent_id ?? "—"}
-                      </TableCell>
-                      <TableCell>
-                        {(() => {
-                          const pill = jobStatusPill(job.status);
-                          return pill ? (
-                            <StatusPill tone={pill.tone}>{pill.label}</StatusPill>
-                          ) : (
-                            "—"
-                          );
-                        })()}
-                      </TableCell>
-                      <TableCell>
-                        <LinkButton
+                      {job.cname ?? "—"}
+                    </JobsTableCell>
+                    <JobsTableCell>
+                      <RegPlate value={job.vehicleno} />
+                    </JobsTableCell>
+                    <JobsTableCell className="text-muted-foreground">
+                      {job.vehicle_type ?? "—"}
+                    </JobsTableCell>
+                    <JobsTableCell
+                      className="max-w-[150px] truncate text-muted-foreground"
+                      title={job.bankname ?? undefined}
+                    >
+                      {job.bankname ?? job.bank_id ?? "—"}
+                    </JobsTableCell>
+                    <JobsTableCell
+                      className="max-w-[120px] truncate"
+                      title={job.agent_name ?? undefined}
+                    >
+                      {job.agent_name ?? job.agent_id ?? "—"}
+                    </JobsTableCell>
+                    <JobsTableCell>
+                      {pill ? (
+                        <StatusPill tone={pill.tone}>{pill.label}</StatusPill>
+                      ) : (
+                        "—"
+                      )}
+                    </JobsTableCell>
+                    <JobsTableCell>
+                      <JobActions>
+                        <JobActionLink
                           href={inspectPathForJob(job.id, job.vehicle_type)}
-                          size="sm"
-                          variant="outline"
-                        >
-                          Open
-                        </LinkButton>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                          tone="primary"
+                          icon={Eye}
+                          label="Open"
+                        />
+                      </JobActions>
+                    </JobsTableCell>
+                  </JobsTableRow>
+                );
+              })}
+            </TableBody>
+          </JobsTable>
+        ) : null}
+      </JobsListingCard>
     </>
   );
 }

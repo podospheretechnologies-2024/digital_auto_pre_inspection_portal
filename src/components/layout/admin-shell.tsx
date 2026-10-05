@@ -17,7 +17,7 @@ export function AdminShell({
 }) {
   return (
     <SidebarProvider
-      style={{ "--sidebar-width": "270px" } as React.CSSProperties}
+      style={{ "--sidebar-width": "228px" } as React.CSSProperties}
     >
       <PresencePing />
       <AppSidebar userName={userName} roleLabel={roleLabel} />

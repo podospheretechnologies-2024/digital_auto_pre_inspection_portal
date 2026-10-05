@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { StatusPill } from "@/components/atlas/status-pill";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -98,6 +99,10 @@ export function PeopleCrudPage({
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
   const [form, setForm] = useState(emptyForm);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
 
   const listQuery = useQuery({
     queryKey: [queryKey],
@@ -309,15 +314,12 @@ export function PeopleCrudPage({
                       size="sm"
                       variant="outline"
                       disabled={deleteMutation.isPending}
-                      onClick={() => {
-                        if (
-                          confirm(
-                            `Delete ${row.first_name} ${row.last_name}?`,
-                          )
-                        ) {
-                          deleteMutation.mutate(row.id);
-                        }
-                      }}
+                      onClick={() =>
+                        setDeleteTarget({
+                          id: row.id,
+                          name: `${row.first_name} ${row.last_name}`.trim(),
+                        })
+                      }
                     >
                       Delete
                     </Button>
@@ -507,6 +509,28 @@ export function PeopleCrudPage({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={deleteTarget != null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        tone="danger"
+        title="Delete user?"
+        description={
+          deleteTarget
+            ? `“${deleteTarget.name}” will be removed. This cannot be undone.`
+            : undefined
+        }
+        confirmLabel="Delete"
+        loading={deleteMutation.isPending}
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          deleteMutation.mutate(deleteTarget.id, {
+            onSettled: () => setDeleteTarget(null),
+          });
+        }}
+      />
     </>
   );
 }

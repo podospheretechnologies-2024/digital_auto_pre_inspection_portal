@@ -1,31 +1,31 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { Eye, FileText, Search } from "lucide-react";
 import { useState } from "react";
 
-import { JobsNav } from "@/components/jobs/jobs-nav";
 import { RegPlate } from "@/components/atlas/reg-plate";
+import {
+  JobActionButton,
+  JobActionLink,
+  JobActions,
+  JobDtiCell,
+  JobMetaLine,
+  JobSerialCell,
+  JobSerialHead,
+  JobsListingCard,
+  JobsTable,
+  JobsTableCell,
+  JobsTableHead,
+  JobsTableHeader,
+  JobsTableRow,
+  TableBody,
+} from "@/components/jobs/jobs-listing";
+import { JobsNav } from "@/components/jobs/jobs-nav";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LinkButton } from "@/components/ui/link-button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   inspectPathForJob,
   pdfPathForInspection,
@@ -71,45 +71,26 @@ export function ReportsPage() {
     },
   });
 
+  const rows = listQuery.data ?? [];
+
   return (
     <>
       <PageHeader
-        title="Pre-Inspection reports"
-        description="Global search across QC-approved 2W / 3W / 4W cases"
+        title="Data export"
+        description="Search QC-approved 2W / 3W / 4W cases and export report data."
+        eyebrow="Manage"
       />
       <JobsNav active="/jobs/reports" />
 
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Search</CardTitle>
-          <CardDescription>
-            Filter by customer, vehicle number, or DTI / bank ref
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap items-end gap-3">
-          <div className="space-y-1.5">
-            <Label>Customer</Label>
-            <Input
-              value={customer}
-              onChange={(e) => setCustomer(e.target.value)}
-              placeholder="Name contains…"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Vehicle no</Label>
-            <Input
-              value={vehicleno}
-              onChange={(e) => setVehicleno(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>DTI / Ref</Label>
-            <Input
-              value={refNo}
-              onChange={(e) => setRefNo(e.target.value)}
-            />
-          </div>
-          <Button
+      <JobsListingCard
+        className="mb-4"
+        title="Search filters"
+        description="Filter by customer, vehicle number, or DTI / bank ref"
+        toolbar={
+          <JobActionButton
+            tone="primary"
+            icon={Search}
+            label="Search"
             onClick={() =>
               setSubmitted({
                 customer,
@@ -117,97 +98,126 @@ export function ReportsPage() {
                 ref_no: refNo,
               })
             }
-          >
-            Search
-          </Button>
-        </CardContent>
-      </Card>
+          />
+        }
+      >
+        <div className="flex flex-wrap items-end gap-3 px-4 py-3">
+          <div className="min-w-[10rem] flex-1 space-y-1.5">
+            <Label className="text-[11px] text-muted-foreground">Customer</Label>
+            <Input
+              value={customer}
+              onChange={(e) => setCustomer(e.target.value)}
+              placeholder="Name contains…"
+              className="h-8 text-[13px]"
+            />
+          </div>
+          <div className="min-w-[10rem] flex-1 space-y-1.5">
+            <Label className="text-[11px] text-muted-foreground">
+              Vehicle no
+            </Label>
+            <Input
+              value={vehicleno}
+              onChange={(e) => setVehicleno(e.target.value)}
+              className="h-8 text-[13px]"
+            />
+          </div>
+          <div className="min-w-[10rem] flex-1 space-y-1.5">
+            <Label className="text-[11px] text-muted-foreground">DTI / Ref</Label>
+            <Input
+              value={refNo}
+              onChange={(e) => setRefNo(e.target.value)}
+              className="h-8 text-[13px]"
+            />
+          </div>
+        </div>
+      </JobsListingCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Results</CardTitle>
-          <CardDescription>
-            {listQuery.isFetching
-              ? "Searching…"
-              : `${listQuery.data?.length ?? 0} rows`}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {listQuery.isError ? (
-            <p className="text-sm text-destructive">
-              {(listQuery.error as Error).message}
-            </p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Type</TableHead>
-                  <TableHead>DTI</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Vehicle</TableHead>
-                  <TableHead>Bank</TableHead>
-                  <TableHead>Agent</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(listQuery.data ?? []).length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={8}
-                      className="text-center text-muted-foreground"
+      <JobsListingCard
+        title="Results"
+        description={
+          listQuery.isFetching ? "Searching…" : `${rows.length} matching rows`
+        }
+        count={listQuery.isFetching ? undefined : rows.length}
+        loading={listQuery.isLoading}
+        error={
+          listQuery.isError ? (listQuery.error as Error).message : null
+        }
+        empty="No matching reports"
+      >
+        {rows.length > 0 ? (
+          <JobsTable>
+            <JobsTableHeader>
+              <JobsTableRow>
+                <JobSerialHead />
+                <JobsTableHead>Type</JobsTableHead>
+                <JobsTableHead>DTI</JobsTableHead>
+                <JobsTableHead>Customer</JobsTableHead>
+                <JobsTableHead>Vehicle</JobsTableHead>
+                <JobsTableHead>Bank</JobsTableHead>
+                <JobsTableHead>Agent</JobsTableHead>
+                <JobsTableHead>Price</JobsTableHead>
+                <JobsTableHead className="text-right">Actions</JobsTableHead>
+              </JobsTableRow>
+            </JobsTableHeader>
+            <TableBody>
+              {rows.map((row, index) => (
+                <JobsTableRow key={`${row.vehicle_type}-${row.id}`}>
+                  <JobSerialCell index={index} />
+                  <JobsTableCell>
+                    <Badge variant="outline" className="font-normal">
+                      {row.vehicle_type}
+                    </Badge>
+                  </JobsTableCell>
+                  <JobsTableCell>
+                    <JobDtiCell value={row.dti_no} />
+                  </JobsTableCell>
+                  <JobsTableCell className="font-medium">
+                    {row.cname ?? "—"}
+                  </JobsTableCell>
+                  <JobsTableCell>
+                    <RegPlate value={row.vehicleno} />
+                    <JobMetaLine>
+                      {[row.company, row.model].filter(Boolean).join(" / ")}
+                    </JobMetaLine>
+                  </JobsTableCell>
+                  <JobsTableCell>
+                    <div
+                      className="max-w-[140px] truncate"
+                      title={row.bankname}
                     >
-                      No matches
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  (listQuery.data ?? []).map((row) => (
-                    <TableRow key={`${row.vehicle_type}-${row.id}`}>
-                      <TableCell>
-                        <Badge variant="outline">{row.vehicle_type}</Badge>
-                      </TableCell>
-                      <TableCell>{row.dti_no ?? "—"}</TableCell>
-                      <TableCell>{row.cname ?? "—"}</TableCell>
-                      <TableCell>
-                        <RegPlate value={row.vehicleno} />
-                        <div className="text-xs text-muted-foreground">
-                          {[row.company, row.model].filter(Boolean).join(" / ")}
-                        </div>
-                      </TableCell>
-                      <TableCell>{row.bankname}</TableCell>
-                      <TableCell>{row.agent_name}</TableCell>
-                      <TableCell>{row.valuation_price ?? "—"}</TableCell>
-                      <TableCell className="space-x-2">
-                        {row.job_id ? (
-                          <LinkButton
-                            href={inspectPathForJob(
-                              row.job_id,
-                              row.vehicle_type,
-                              { mode: "view" },
-                            )}
-                            size="sm"
-                            variant="outline"
-                          >
-                            View
-                          </LinkButton>
-                        ) : null}
-                        <LinkButton
-                          href={pdfPathForInspection(row.vehicle_type, row.id)}
-                          size="sm"
-                          variant="outline"
-                        >
-                          PDF
-                        </LinkButton>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                      {row.bankname}
+                    </div>
+                  </JobsTableCell>
+                  <JobsTableCell>{row.agent_name}</JobsTableCell>
+                  <JobsTableCell>{row.valuation_price ?? "—"}</JobsTableCell>
+                  <JobsTableCell>
+                    <JobActions>
+                      {row.job_id ? (
+                        <JobActionLink
+                          href={inspectPathForJob(
+                            row.job_id,
+                            row.vehicle_type,
+                            { mode: "view" },
+                          )}
+                          tone="outline"
+                          icon={Eye}
+                          label="View"
+                        />
+                      ) : null}
+                      <JobActionLink
+                        href={pdfPathForInspection(row.vehicle_type, row.id)}
+                        tone="primary"
+                        icon={FileText}
+                        label="PDF"
+                      />
+                    </JobActions>
+                  </JobsTableCell>
+                </JobsTableRow>
+              ))}
+            </TableBody>
+          </JobsTable>
+        ) : null}
+      </JobsListingCard>
     </>
   );
 }

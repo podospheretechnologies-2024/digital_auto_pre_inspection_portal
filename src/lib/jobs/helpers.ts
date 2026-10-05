@@ -118,6 +118,20 @@ export function parseJobDate(input: string): Date {
   return fallback;
 }
 
+/** Format desk-arrival date for workflow listings. */
+export function formatDeskDate(
+  value: Date | string | null | undefined,
+): string {
+  if (!value) return "—";
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 export async function resolveFinYear(db: {
   fin_year: {
     findFirst: (args: {

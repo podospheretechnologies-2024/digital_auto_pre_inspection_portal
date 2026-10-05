@@ -35,6 +35,13 @@ export type JobListItem = {
   cdate: Date | null;
   created_at: Date | null;
   updated_at: Date | null;
+  assigned_at: Date | null;
+  hold_at: Date | null;
+  cancelled_at: Date | null;
+  /** When inspection was submitted to QC */
+  inspection_at: Date | null;
+  /** When QC approved / completed */
+  qc_datetime: Date | null;
   on_hold?: number;
   is_deleted?: number;
   bankname?: string;
@@ -67,6 +74,9 @@ async function enrichJobs(
     cdate: Date;
     created_at: Date | null;
     updated_at: Date | null;
+    assigned_at?: Date | null;
+    hold_at?: Date | null;
+    cancelled_at?: Date | null;
     on_hold?: number | null;
     is_deleted?: number | null;
   }>,
@@ -89,15 +99,33 @@ async function enrichJobs(
       }),
       db.tbl_2wheeler.findMany({
         where: { job_id: { in: rows.map((r) => r.id) } },
-        select: { id: true, job_id: true, qc: true },
+        select: {
+          id: true,
+          job_id: true,
+          qc: true,
+          created_at: true,
+          qc_datetime: true,
+        },
       }),
       db.tbl_3wheeler.findMany({
         where: { job_id: { in: rows.map((r) => r.id) } },
-        select: { id: true, job_id: true, qc: true },
+        select: {
+          id: true,
+          job_id: true,
+          qc: true,
+          created_at: true,
+          qc_datetime: true,
+        },
       }),
       db.tbl_4wheeler.findMany({
         where: { job_id: { in: rows.map((r) => r.id) } },
-        select: { id: true, job_id: true, qc: true },
+        select: {
+          id: true,
+          job_id: true,
+          qc: true,
+          created_at: true,
+          qc_datetime: true,
+        },
       }),
     ]);
 
@@ -111,19 +139,43 @@ async function enrichJobs(
 
   const inspByJob = new Map<
     number,
-    { id: number; qc: number; kind: string }
+    {
+      id: number;
+      qc: number;
+      kind: string;
+      created_at: Date | null;
+      qc_datetime: Date | null;
+    }
   >();
   for (const row of tw) {
     if (row.job_id != null)
-      inspByJob.set(row.job_id, { id: row.id, qc: row.qc, kind: "2wheeler" });
+      inspByJob.set(row.job_id, {
+        id: row.id,
+        qc: row.qc,
+        kind: "2wheeler",
+        created_at: row.created_at,
+        qc_datetime: row.qc_datetime,
+      });
   }
   for (const row of th) {
     if (row.job_id != null)
-      inspByJob.set(row.job_id, { id: row.id, qc: row.qc, kind: "3wheeler" });
+      inspByJob.set(row.job_id, {
+        id: row.id,
+        qc: row.qc,
+        kind: "3wheeler",
+        created_at: row.created_at,
+        qc_datetime: row.qc_datetime,
+      });
   }
   for (const row of fw) {
     if (row.job_id != null)
-      inspByJob.set(row.job_id, { id: row.id, qc: row.qc, kind: "4wheeler" });
+      inspByJob.set(row.job_id, {
+        id: row.id,
+        qc: row.qc,
+        kind: "4wheeler",
+        created_at: row.created_at,
+        qc_datetime: row.qc_datetime,
+      });
   }
 
   return rows.map((row) => {
@@ -155,6 +207,11 @@ async function enrichJobs(
       cdate: row.cdate,
       created_at: row.created_at,
       updated_at: row.updated_at,
+      assigned_at: row.assigned_at ?? null,
+      hold_at: row.hold_at ?? null,
+      cancelled_at: row.cancelled_at ?? null,
+      inspection_at: insp?.created_at ?? null,
+      qc_datetime: insp?.qc_datetime ?? null,
       on_hold: Number(row.on_hold ?? 0),
       is_deleted: Number(row.is_deleted ?? 0),
       bankname: row.bank_id ? (bankMap.get(row.bank_id) ?? "—") : "—",
@@ -364,12 +421,15 @@ export async function updateJob(input: UpdateJobInput) {
 
 /** Assign (or reassign) surveyor/agent — Laravel assignupdate_agent (+ SMS). */
 export async function assignJob(jobId: number, agentId: number) {
+  const now = new Date();
   const updated = await db.tbl_jobs.update({
     where: { id: jobId },
     data: {
       agent_id: agentId,
       on_hold: 0,
-      updated_at: new Date(),
+      hold_at: null,
+      assigned_at: now,
+      updated_at: now,
     },
   });
 
@@ -401,23 +461,34 @@ export async function applyWorkflowAction(
       if (job.is_deleted === 1) throw new Error("CANCELLED");
       return db.tbl_jobs.update({
         where: { id: jobId },
-        data: { on_hold: 1, updated_at: now },
+        data: { on_hold: 1, hold_at: now, updated_at: now },
       });
     case "resume":
       if (job.is_deleted === 1) throw new Error("CANCELLED");
       return db.tbl_jobs.update({
         where: { id: jobId },
-        data: { on_hold: 0, updated_at: now },
+        data: { on_hold: 0, hold_at: null, updated_at: now },
       });
     case "cancel":
       return db.tbl_jobs.update({
         where: { id: jobId },
-        data: { is_deleted: 1, on_hold: 0, updated_at: now },
+        data: {
+          is_deleted: 1,
+          on_hold: 0,
+          hold_at: null,
+          cancelled_at: now,
+          updated_at: now,
+        },
       });
     case "restore":
       return db.tbl_jobs.update({
         where: { id: jobId },
-        data: { is_deleted: 0, on_hold: 0, updated_at: now },
+        data: {
+          is_deleted: 0,
+          on_hold: 0,
+          cancelled_at: null,
+          updated_at: now,
+        },
       });
   }
 }

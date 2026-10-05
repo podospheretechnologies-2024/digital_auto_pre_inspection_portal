@@ -1,23 +1,29 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Ban, Eye, Play } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { RegPlate } from "@/components/atlas/reg-plate";
-import { jobStatusPill, StatusPill } from "@/components/atlas/status-pill";
-import { PageHeader } from "@/components/layout/page-header";
-import { WorkflowStrip } from "@/components/jobs/workflow-strip";
-import { Button } from "@/components/ui/button";
-import { LinkButton } from "@/components/ui/link-button";
 import {
-  Table,
+  JobActionButton,
+  JobActionLink,
+  JobActions,
+  JobDtiCell,
+  JobSerialCell,
+  JobSerialHead,
+  JobsListingCard,
+  JobsTable,
+  JobsTableCell,
+  JobsTableHead,
+  JobsTableHeader,
+  JobsTableRow,
   TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { inspectPathForJob } from "@/lib/jobs/helpers";
+} from "@/components/jobs/jobs-listing";
+import { PageHeader } from "@/components/layout/page-header";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { formatDeskDate, inspectPathForJob } from "@/lib/jobs/helpers";
 
 type Row = {
   id: number;
@@ -29,6 +35,8 @@ type Row = {
   agent_name?: string;
   vehicle_type: string | null;
   inspection_id?: number | null;
+  hold_at?: string | null;
+  updated_at?: string | null;
 };
 
 async function apiJson<T>(url: string, init?: RequestInit): Promise<T> {
@@ -43,6 +51,7 @@ async function apiJson<T>(url: string, init?: RequestInit): Promise<T> {
 
 export function HoldCasesPage() {
   const queryClient = useQueryClient();
+  const [cancelId, setCancelId] = useState<number | null>(null);
   const listQuery = useQuery({
     queryKey: ["jobs-hold"],
     queryFn: () =>
@@ -74,101 +83,114 @@ export function HoldCasesPage() {
     <>
       <PageHeader
         title="Hold"
-        description="Paused cases — resume to continue QC / assign, or cancel"
+        description="Paused cases. Resume to continue assign or QC, or cancel if no longer needed."
+        eyebrow="Workflow"
+        badge="On hold"
       />
-      <WorkflowStrip active="hold" />
 
-      {listQuery.isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : (
-        <div className="rounded-xl border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>DTI</TableHead>
-                <TableHead>Vehicle</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Agent</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
+      <JobsListingCard
+        title="Cases on hold"
+        description="Resume work or cancel cases that are no longer required"
+        count={rows.length}
+        loading={listQuery.isLoading}
+        error={
+          listQuery.isError ? (listQuery.error as Error).message : null
+        }
+        empty="No cases on hold"
+      >
+        {rows.length > 0 ? (
+          <JobsTable>
+            <JobsTableHeader>
+              <JobsTableRow>
+                <JobSerialHead />
+                <JobsTableHead>DTI</JobsTableHead>
+                <JobsTableHead>Vehicle</JobsTableHead>
+                <JobsTableHead>Customer</JobsTableHead>
+                <JobsTableHead>Agent</JobsTableHead>
+                <JobsTableHead>Date</JobsTableHead>
+                <JobsTableHead className="text-right">Actions</JobsTableHead>
+              </JobsTableRow>
+            </JobsTableHeader>
             <TableBody>
-              {rows.map((row) => {
-                const pill = jobStatusPill(row.status);
+              {rows.map((row, index) => {
                 return (
-                  <TableRow key={row.id}>
-                    <TableCell className="font-medium">
-                      {row.dti_no ?? row.id}
-                    </TableCell>
-                    <TableCell>
+                  <JobsTableRow key={row.id}>
+                    <JobSerialCell index={index} />
+                    <JobsTableCell>
+                      <JobDtiCell value={row.dti_no ?? row.id} />
+                    </JobsTableCell>
+                    <JobsTableCell>
                       {row.vehicleno ? (
                         <RegPlate value={row.vehicleno} />
                       ) : (
                         "—"
                       )}
-                    </TableCell>
-                    <TableCell>{row.cname ?? "—"}</TableCell>
-                    <TableCell>{row.agent_name ?? "—"}</TableCell>
-                    <TableCell>
-                      {pill ? (
-                        <StatusPill tone={pill.tone}>{pill.label}</StatusPill>
-                      ) : (
-                        row.status
-                      )}
-                    </TableCell>
-                    <TableCell className="space-x-1 text-right">
-                      <LinkButton
-                        href={inspectPathForJob(row.id, row.vehicle_type, {
-                          mode: row.inspection_id ? "edit" : "create",
-                        })}
-                        size="sm"
-                        variant="outline"
-                      >
-                        Open
-                      </LinkButton>
-                      <Button
-                        size="sm"
-                        disabled={actionMutation.isPending}
-                        onClick={() =>
-                          actionMutation.mutate({ id: row.id, action: "resume" })
-                        }
-                      >
-                        Resume
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={actionMutation.isPending}
-                        onClick={() => {
-                          if (confirm("Cancel this case?")) {
+                    </JobsTableCell>
+                    <JobsTableCell className="font-medium">
+                      {row.cname ?? "—"}
+                    </JobsTableCell>
+                    <JobsTableCell>{row.agent_name ?? "—"}</JobsTableCell>
+                    <JobsTableCell className="tabular-nums text-muted-foreground">
+                      {formatDeskDate(row.hold_at ?? row.updated_at)}
+                    </JobsTableCell>
+                    <JobsTableCell>
+                      <JobActions>
+                        <JobActionLink
+                          href={inspectPathForJob(row.id, row.vehicle_type, {
+                            mode: row.inspection_id ? "edit" : "create",
+                          })}
+                          tone="outline"
+                          icon={Eye}
+                          label="Open"
+                        />
+                        <JobActionButton
+                          tone="success"
+                          icon={Play}
+                          label="Resume"
+                          disabled={actionMutation.isPending}
+                          onClick={() =>
                             actionMutation.mutate({
                               id: row.id,
-                              action: "cancel",
-                            });
+                              action: "resume",
+                            })
                           }
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                    </TableCell>
-                  </TableRow>
+                        />
+                        <JobActionButton
+                          tone="danger"
+                          icon={Ban}
+                          label="Cancel"
+                          disabled={actionMutation.isPending}
+                          onClick={() => setCancelId(row.id)}
+                        />
+                      </JobActions>
+                    </JobsTableCell>
+                  </JobsTableRow>
                 );
               })}
-              {rows.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={6}
-                    className="text-center text-muted-foreground"
-                  >
-                    No cases on hold.
-                  </TableCell>
-                </TableRow>
-              ) : null}
             </TableBody>
-          </Table>
-        </div>
-      )}
+          </JobsTable>
+        ) : null}
+      </JobsListingCard>
+
+      <ConfirmDialog
+        open={cancelId != null}
+        onOpenChange={(open) => {
+          if (!open) setCancelId(null);
+        }}
+        tone="danger"
+        title="Cancel this case?"
+        description="The case will move to the Cancel queue. You can restore it later if needed."
+        confirmLabel="Cancel case"
+        cancelLabel="Keep case"
+        loading={actionMutation.isPending}
+        onConfirm={() => {
+          if (cancelId == null) return;
+          actionMutation.mutate(
+            { id: cancelId, action: "cancel" },
+            { onSettled: () => setCancelId(null) },
+          );
+        }}
+      />
     </>
   );
 }
