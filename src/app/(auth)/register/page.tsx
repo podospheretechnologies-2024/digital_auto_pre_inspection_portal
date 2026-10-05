@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { RegisterForm } from "@/app/(auth)/register/register-form";
 import { auth } from "@/auth";
-import { listCities } from "@/lib/masters/service";
+import { getPersonLookups } from "@/lib/account/staff";
 
 export default async function RegisterPage() {
   const session = await auth();
@@ -10,12 +10,11 @@ export default async function RegisterPage() {
     redirect("/dashboard");
   }
 
-  const cities = await listCities();
-  const options = cities.map((c) => ({ id: c.id, name: c.name }));
+  const lookups = await getPersonLookups();
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(ellipse_at_top,_#efe6d8_0%,_#faf7f2_45%,_#f5efe6_100%)] p-4">
-      <RegisterForm cities={options} />
+      <RegisterForm cities={lookups.cities} ros={lookups.ros} />
     </div>
   );
 }

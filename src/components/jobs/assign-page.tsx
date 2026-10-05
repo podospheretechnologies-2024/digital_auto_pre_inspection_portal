@@ -65,6 +65,7 @@ type AgentItem = LookupItem & {
   type?: string | null;
   email?: string | null;
   city_id?: number | null;
+  parent_id?: number | null;
 };
 type VariantItem = LookupItem & {
   vehicle_type?: string;
@@ -239,9 +240,8 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
     return agents.filter(
       (a) =>
         a.type === "Surveyor" &&
-        a.city_id != null &&
-        selectedRo.city_id != null &&
-        a.city_id === selectedRo.city_id,
+        a.parent_id != null &&
+        a.parent_id === selectedRo.id,
     );
   }, [agents, selectedRo]);
 
@@ -943,8 +943,8 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
               </select>
               {selectedRoId && surveyorsUnderRo.length === 0 ? (
                 <p className="text-[11px] text-amber-700">
-                  No verified Surveyor found under this RO&apos;s city. Add or
-                  approve a Surveyor in the same city first.
+                  No verified Surveyor linked to this RO. Create a Surveyor
+                  under this RO (parent link) and Approve them first.
                 </p>
               ) : null}
             </div>

@@ -67,6 +67,7 @@ export async function GET(request: Request) {
           email: a.email,
           type: a.type,
           city_id: a.city_id,
+          parent_id: a.parent_id,
         })),
         brokers: brokers.map((b) => ({ id: b.id, name: b.name })),
       },

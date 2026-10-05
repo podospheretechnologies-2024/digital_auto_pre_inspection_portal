@@ -24,11 +24,14 @@ export async function GET() {
   if (user instanceof NextResponse) return user;
 
   try {
-    const [data, cities] = await Promise.all([
+    const [data, lookups] = await Promise.all([
       listStaff(),
       getPersonLookups(),
     ]);
-    return NextResponse.json({ data, lookups: { cities } });
+    return NextResponse.json({
+      data,
+      lookups: { cities: lookups.cities },
+    });
   } catch (error) {
     console.error(error);
     return NextResponse.json(

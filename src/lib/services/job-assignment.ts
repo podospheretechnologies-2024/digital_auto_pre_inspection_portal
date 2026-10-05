@@ -338,6 +338,7 @@ export async function listAgents() {
       last_name: true,
       email: true,
       city_id: true,
+      parent_id: true,
       type: true,
     },
   });
@@ -421,6 +422,31 @@ export async function updateJob(input: UpdateJobInput) {
 
 /** Assign (or reassign) surveyor/agent — Laravel assignupdate_agent (+ SMS). */
 export async function assignJob(jobId: number, agentId: number) {
+  const agent = await db.users.findFirst({
+    where: {
+      id: agentId,
+      type: "Surveyor",
+      is_deleted: 0,
+      verified_at: { not: null },
+      parent_id: { not: null },
+    },
+    select: { id: true, parent_id: true },
+  });
+  if (!agent?.parent_id) {
+    throw new Error("INVALID_SURVEYOR");
+  }
+
+  const parentRo = await db.users.findFirst({
+    where: {
+      id: agent.parent_id,
+      type: "RO",
+      is_deleted: 0,
+      verified_at: { not: null },
+    },
+    select: { id: true },
+  });
+  if (!parentRo) throw new Error("INVALID_PARENT_RO");
+
   const now = new Date();
   const updated = await db.tbl_jobs.update({
     where: { id: jobId },

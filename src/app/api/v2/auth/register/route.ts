@@ -1,12 +1,9 @@
 import { NextResponse } from "next/server";
 
 import { zodErrorResponse } from "@/lib/api";
-import {
-  registerSchema,
-  registerSurveyor,
-} from "@/lib/account/register";
+import { registerSchema, registerSurveyor } from "@/lib/account/register";
 
-/** Guest Surveyor self-signup (Laravel RegisteredUserController::store). */
+/** Guest Surveyor self-signup under a verified RO. */
 export async function POST(request: Request) {
   const body = await request.json();
   const parsed = registerSchema.safeParse(body);
@@ -17,7 +14,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       message:
-        "Agent registration completed. Please wait for account verification.",
+        "Registration completed. Please wait for HO approval before login.",
     });
   } catch (error) {
     if (error instanceof Error && error.message === "EMAIL_TAKEN") {
@@ -34,6 +31,15 @@ export async function POST(request: Request) {
         {
           message: "Invalid city",
           errors: { city_id: ["Select a valid city."] },
+        },
+        { status: 422 },
+      );
+    }
+    if (error instanceof Error && error.message === "INVALID_PARENT_RO") {
+      return NextResponse.json(
+        {
+          message: "Select a verified RO",
+          errors: { parent_id: ["Invalid or unverified RO."] },
         },
         { status: 422 },
       );

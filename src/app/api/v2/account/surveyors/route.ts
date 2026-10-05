@@ -27,11 +27,11 @@ export async function GET() {
   if (user instanceof NextResponse) return user;
 
   try {
-    const [data, cities] = await Promise.all([
+    const [data, lookups] = await Promise.all([
       listSurveyors(),
       getPersonLookups(),
     ]);
-    return NextResponse.json({ data, lookups: { cities } });
+    return NextResponse.json({ data, lookups });
   } catch (error) {
     console.error(error);
     return NextResponse.json(
@@ -58,6 +58,18 @@ export async function POST(request: Request) {
       if (error instanceof Error && error.message === "NOT_FOUND") {
         return NextResponse.json({ message: "Not found" }, { status: 404 });
       }
+      if (error instanceof Error && error.message === "PARENT_RO_REQUIRED") {
+        return NextResponse.json(
+          { message: "Link Surveyor to a verified RO before approve" },
+          { status: 422 },
+        );
+      }
+      if (error instanceof Error && error.message === "INVALID_PARENT_RO") {
+        return NextResponse.json(
+          { message: "Parent RO is invalid or unverified" },
+          { status: 422 },
+        );
+      }
       console.error(error);
       return NextResponse.json({ message: "Approve failed" }, { status: 500 });
     }
@@ -74,11 +86,39 @@ export async function POST(request: Request) {
 
   try {
     const data = await createPerson(parsed.data);
-    return NextResponse.json({ data, ok: true }, { status: 201 });
+    return NextResponse.json(
+      {
+        data,
+        ok: true,
+        message:
+          parsed.data.role === "RO" || parsed.data.role === "Surveyor"
+            ? "Created — approve before they can login"
+            : "Created",
+      },
+      { status: 201 },
+    );
   } catch (error) {
     if (error instanceof Error && error.message === "EMAIL_TAKEN") {
       return NextResponse.json(
         { message: "Email already in use", errors: { email: ["Taken"] } },
+        { status: 422 },
+      );
+    }
+    if (error instanceof Error && error.message === "INVALID_PARENT_RO") {
+      return NextResponse.json(
+        {
+          message: "Select a verified RO first",
+          errors: { parent_id: ["Invalid or unverified RO"] },
+        },
+        { status: 422 },
+      );
+    }
+    if (error instanceof Error && error.message === "PARENT_RO_REQUIRED") {
+      return NextResponse.json(
+        {
+          message: "Surveyor must be linked to an RO",
+          errors: { parent_id: ["Required"] },
+        },
         { status: 422 },
       );
     }
@@ -110,6 +150,24 @@ export async function PUT(request: Request) {
     }
     if (error instanceof Error && error.message === "INVALID_ROLE") {
       return NextResponse.json({ message: "Invalid role" }, { status: 422 });
+    }
+    if (error instanceof Error && error.message === "INVALID_PARENT_RO") {
+      return NextResponse.json(
+        {
+          message: "Select a verified RO first",
+          errors: { parent_id: ["Invalid or unverified RO"] },
+        },
+        { status: 422 },
+      );
+    }
+    if (error instanceof Error && error.message === "PARENT_RO_REQUIRED") {
+      return NextResponse.json(
+        {
+          message: "Surveyor must be linked to an RO",
+          errors: { parent_id: ["Required"] },
+        },
+        { status: 422 },
+      );
     }
     console.error(error);
     return NextResponse.json({ message: "Update failed" }, { status: 500 });

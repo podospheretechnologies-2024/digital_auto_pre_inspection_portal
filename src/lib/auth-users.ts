@@ -1,5 +1,6 @@
 import { compare } from "bcryptjs";
 
+import { clampSurveyorPermissions } from "@/lib/account/permissions-policy";
 import { db } from "@/lib/db";
 import { toSessionUser } from "@/lib/rbac";
 import type { SessionUser } from "@/types/next-auth";
@@ -10,7 +11,10 @@ export async function findUserByEmail(email: string) {
   });
 }
 
-export async function getUserPermissions(userId: number): Promise<string[]> {
+export async function getUserPermissions(
+  userId: number,
+  userType?: string | null,
+): Promise<string[]> {
   try {
     const rows = await db.user_permissions.findMany({
       where: {
@@ -22,7 +26,11 @@ export async function getUserPermissions(userId: number): Promise<string[]> {
       },
     });
 
-    return rows.map((row) => row.permission);
+    let permissions = rows.map((row) => row.permission);
+    if (userType === "Surveyor") {
+      permissions = clampSurveyorPermissions(permissions);
+    }
+    return permissions;
   } catch {
     // Table may be missing until prisma db pull / migration parity
     return [];
@@ -50,6 +58,15 @@ export async function authenticateUser(
     return null;
   }
 
+  // RO / Surveyor must be approved (verified_at) before login
+  const type = String(user.type ?? "").trim();
+  if (
+    (type === "RO" || type === "Surveyor") &&
+    user.verified_at == null
+  ) {
+    return null;
+  }
+
   // Laravel uses $2y$ bcrypt hashes; bcryptjs expects $2a$/$2b$
   const hash = user.password.replace(/^\$2y\$/, "$2a$");
   const passwordMatches = await compare(password, hash);
@@ -58,7 +75,7 @@ export async function authenticateUser(
     return null;
   }
 
-  const permissions = await getUserPermissions(user.id);
+  const permissions = await getUserPermissions(user.id, user.type);
 
   return toSessionUser({
     id: user.id,

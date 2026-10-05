@@ -69,23 +69,41 @@ export const personCreateSchema = z
     city: z.coerce.number().int().positive(),
     email: z.string().trim().email().max(255),
     role: personRoleSchema,
+    /** Required when role is Surveyor — parent RO user id */
+    parent_id: z.coerce.number().int().positive().nullable().optional(),
     password: z.string().min(8).max(72),
     password_confirmation: z.string().min(1),
   })
   .refine((data) => data.password === data.password_confirmation, {
     message: "Passwords do not match",
     path: ["password_confirmation"],
-  });
+  })
+  .refine(
+    (data) => data.role !== "Surveyor" || (data.parent_id != null && data.parent_id > 0),
+    {
+      message: "Surveyor must be linked to an RO",
+      path: ["parent_id"],
+    },
+  );
 
-export const personUpdateSchema = z.object({
-  id: z.coerce.number().int().positive(),
-  first_name: z.string().trim().min(1).max(255),
-  last_name: z.string().trim().min(1).max(255),
-  phone: z.string().trim().min(1).max(255),
-  city: z.coerce.number().int().positive(),
-  email: z.string().trim().email().max(255),
-  role: personRoleSchema,
-});
+export const personUpdateSchema = z
+  .object({
+    id: z.coerce.number().int().positive(),
+    first_name: z.string().trim().min(1).max(255),
+    last_name: z.string().trim().min(1).max(255),
+    phone: z.string().trim().min(1).max(255),
+    city: z.coerce.number().int().positive(),
+    email: z.string().trim().email().max(255),
+    role: personRoleSchema,
+    parent_id: z.coerce.number().int().positive().nullable().optional(),
+  })
+  .refine(
+    (data) => data.role !== "Surveyor" || (data.parent_id != null && data.parent_id > 0),
+    {
+      message: "Surveyor must be linked to an RO",
+      path: ["parent_id"],
+    },
+  );
 
 export const personDeleteSchema = z.object({
   id: z.coerce.number().int().positive(),

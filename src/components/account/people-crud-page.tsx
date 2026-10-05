@@ -36,12 +36,14 @@ type Row = {
   type: string | null;
   city: string | null;
   city_id: number | null;
+  parent_id: number | null;
+  parent_name: string | null;
   phone: string | null;
   verified_at: string | null;
   is_online: number;
 };
 
-type Lookup = { id: number; name: string };
+type Lookup = { id: number; name: string; city_id?: number | null };
 
 const emptyForm = {
   first_name: "",
@@ -50,6 +52,7 @@ const emptyForm = {
   city: "",
   email: "",
   role: "" as "" | PersonRole,
+  parent_id: "",
   password: "",
   password_confirmation: "",
 };
@@ -107,11 +110,18 @@ export function PeopleCrudPage({
   const listQuery = useQuery({
     queryKey: [queryKey],
     queryFn: () =>
-      apiJson<{ data: Row[]; lookups: { cities: Lookup[] } }>(apiPath),
+      apiJson<{
+        data: Row[];
+        lookups: { cities: Lookup[]; ros?: Lookup[] };
+      }>(apiPath),
   });
 
   const cities = listQuery.data?.lookups.cities ?? [];
+  const ros = listQuery.data?.lookups.ros ?? [];
   const rows = listQuery.data?.data ?? [];
+  const selectedRole = (form.role || defaultRole) as PersonRole;
+  const needsParentRo =
+    roleOptions.includes("Surveyor") && selectedRole === "Surveyor";
 
   function openCreate() {
     setEditingId(null);
@@ -128,6 +138,7 @@ export function PeopleCrudPage({
       city: row.city_id != null ? String(row.city_id) : "",
       email: row.email,
       role: row.role,
+      parent_id: row.parent_id != null ? String(row.parent_id) : "",
       password: "",
       password_confirmation: "",
     });
@@ -137,6 +148,10 @@ export function PeopleCrudPage({
   const saveMutation = useMutation({
     mutationFn: async () => {
       const role = form.role || defaultRole;
+      const parentPayload =
+        role === "Surveyor"
+          ? { parent_id: form.parent_id ? Number(form.parent_id) : null }
+          : { parent_id: null };
       if (editingId) {
         return apiJson(apiPath, {
           method: "PUT",
@@ -148,10 +163,11 @@ export function PeopleCrudPage({
             city: Number(form.city),
             email: form.email,
             role,
+            ...parentPayload,
           }),
         });
       }
-      return apiJson(apiPath, {
+      return apiJson<{ message?: string }>(apiPath, {
         method: "POST",
         body: JSON.stringify({
           first_name: form.first_name,
@@ -160,13 +176,19 @@ export function PeopleCrudPage({
           city: Number(form.city),
           email: form.email,
           role,
+          ...parentPayload,
           password: form.password,
           password_confirmation: form.password_confirmation,
         }),
       });
     },
-    onSuccess: async () => {
-      toast.success(editingId ? "Updated" : "Created");
+    onSuccess: async (res) => {
+      toast.success(
+        editingId
+          ? "Updated"
+          : (res as { message?: string })?.message ||
+              "Created — approve before login",
+      );
       setOpen(false);
       setEditingId(null);
       setForm(emptyForm);
@@ -227,6 +249,7 @@ export function PeopleCrudPage({
     form.city &&
     form.email.trim() &&
     (form.role || defaultRole) &&
+    (!needsParentRo || form.parent_id) &&
     (editingId ||
       (form.password &&
         form.password_confirmation &&
@@ -255,6 +278,7 @@ export function PeopleCrudPage({
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
+                <TableHead>Parent RO</TableHead>
                 <TableHead>City</TableHead>
                 <TableHead>Phone</TableHead>
                 {showApprove ? <TableHead>Status</TableHead> : null}
@@ -270,6 +294,11 @@ export function PeopleCrudPage({
                   </TableCell>
                   <TableCell>{row.email}</TableCell>
                   <TableCell>{row.role}</TableCell>
+                  <TableCell>
+                    {row.role === "Surveyor"
+                      ? (row.parent_name ?? "—")
+                      : "—"}
+                  </TableCell>
                   <TableCell>{row.city ?? "—"}</TableCell>
                   <TableCell>{row.phone ?? "—"}</TableCell>
                   {showApprove ? (
@@ -329,7 +358,7 @@ export function PeopleCrudPage({
               {rows.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={7}
+                    colSpan={9}
                     className="text-center text-muted-foreground"
                   >
                     No records.
@@ -411,15 +440,41 @@ export function PeopleCrudPage({
                     setForm((f) => ({
                       ...f,
                       role: e.target.value as PersonRole,
+                      parent_id:
+                        e.target.value === "Surveyor" ? f.parent_id : "",
                     }))
                   }
                 >
                   {roleOptions.map((r) => (
                     <option key={r} value={r}>
-                      {r}
+                      {r === "RO" ? "1. RO (create first)" : "2. Surveyor (link to RO)"}
                     </option>
                   ))}
                 </select>
+              </div>
+            ) : null}
+            {needsParentRo ? (
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label>Parent RO</Label>
+                <select
+                  className="flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm"
+                  value={form.parent_id}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, parent_id: e.target.value }))
+                  }
+                >
+                  <option value="">Select verified RO…</option>
+                  {ros.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
+                {ros.length === 0 ? (
+                  <p className="text-xs text-amber-700">
+                    No verified RO found. Create and Approve an RO first.
+                  </p>
+                ) : null}
               </div>
             ) : null}
             {!editingId ? (

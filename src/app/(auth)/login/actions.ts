@@ -43,7 +43,10 @@ export async function loginAction(
   } catch (error) {
     if (error instanceof AuthError) {
       if (error.type === "CredentialsSignin") {
-        return { error: "Invalid email or password." };
+        return {
+          error:
+            "Invalid email or password — or account pending HO approval.",
+        };
       }
 
       // CallbackRouteError often wraps DB/pool failures; avoid Auth.js doc URL as UX

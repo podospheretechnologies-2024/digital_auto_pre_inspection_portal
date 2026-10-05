@@ -8,6 +8,7 @@ import type {
   PersonRole,
   PersonUpdateInput,
 } from "@/lib/account/schemas";
+import { clampSurveyorPermissions } from "@/lib/account/permissions-policy";
 import { db } from "@/lib/db";
 
 export const staffPasswordSchema = z
@@ -46,13 +47,14 @@ export const resetPasswordSchema = z
     path: ["password_confirmation"],
   });
 
-/** Laravel RegisteredUserController@store — guest Surveyor/RO self-register */
+/** Laravel RegisteredUserController@store — guest Surveyor self-register under RO */
 export const registerSurveyorSchema = z
   .object({
     first_name: z.string().trim().min(1).max(255),
     last_name: z.string().trim().min(1).max(255),
     email: z.string().trim().email().max(255),
     city_id: z.coerce.number().int().positive(),
+    parent_id: z.coerce.number().int().positive(),
     password: z.string().min(8).max(72),
     password_confirmation: z.string().min(1),
   })
@@ -75,6 +77,8 @@ export type PersonRow = {
   status: string | null;
   city_id: number | null;
   city: string | null;
+  parent_id: number | null;
+  parent_name: string | null;
   phone: string | null;
   verified_at: Date | null;
   last_activity: Date | null;
@@ -147,6 +151,7 @@ async function listPeopleByRoles(roles: PersonRole[]): Promise<PersonRow[]> {
       type: true,
       status: true,
       city_id: true,
+      parent_id: true,
       verified_at: true,
       last_activity: true,
       is_online: true,
@@ -168,6 +173,25 @@ async function listPeopleByRoles(roles: PersonRole[]): Promise<PersonRow[]> {
       : [];
   const cityMap = new Map(cities.map((c) => [c.id, c.name]));
 
+  const parentIds = [
+    ...new Set(
+      users.map((u) => u.parent_id).filter((id): id is number => id != null),
+    ),
+  ];
+  const parents =
+    parentIds.length > 0
+      ? await db.users.findMany({
+          where: { id: { in: parentIds } },
+          select: { id: true, first_name: true, last_name: true },
+        })
+      : [];
+  const parentMap = new Map(
+    parents.map((p) => [
+      p.id,
+      `${p.first_name} ${p.last_name}`.trim() || `RO #${p.id}`,
+    ]),
+  );
+
   const userIds = users.map((u) => u.id);
   const infos =
     userIds.length > 0
@@ -188,6 +212,9 @@ async function listPeopleByRoles(roles: PersonRole[]): Promise<PersonRow[]> {
     status: u.status,
     city_id: u.city_id,
     city: u.city_id != null ? (cityMap.get(u.city_id) ?? null) : null,
+    parent_id: u.parent_id,
+    parent_name:
+      u.parent_id != null ? (parentMap.get(u.parent_id) ?? null) : null,
     phone: phoneMap.get(u.id) ?? null,
     verified_at: u.verified_at,
     last_activity: u.last_activity,
@@ -210,11 +237,56 @@ export async function listAdmins() {
   return listPeopleByRoles(["Admin"]);
 }
 
-export async function getPersonLookups() {
-  return db.m_city.findMany({
-    orderBy: { name: "asc" },
-    select: { id: true, name: true },
+export async function listVerifiedRos() {
+  return db.users.findMany({
+    where: {
+      type: "RO",
+      is_deleted: 0,
+      is_admin: 0,
+      verified_at: { not: null },
+    },
+    orderBy: [{ first_name: "asc" }, { last_name: "asc" }],
+    select: {
+      id: true,
+      first_name: true,
+      last_name: true,
+      city_id: true,
+      email: true,
+    },
   });
+}
+
+export async function getPersonLookups() {
+  const [cities, ros] = await Promise.all([
+    db.m_city.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+    listVerifiedRos(),
+  ]);
+  return {
+    cities,
+    ros: ros.map((r) => ({
+      id: r.id,
+      name: `${r.first_name} ${r.last_name}`.trim(),
+      city_id: r.city_id,
+      email: r.email,
+    })),
+  };
+}
+
+async function assertValidRoParent(parentId: number) {
+  const ro = await db.users.findFirst({
+    where: {
+      id: parentId,
+      type: "RO",
+      is_deleted: 0,
+      verified_at: { not: null },
+    },
+    select: { id: true, city_id: true },
+  });
+  if (!ro) throw new Error("INVALID_PARENT_RO");
+  return ro;
 }
 
 export async function createPerson(input: PersonCreateInput) {
@@ -234,22 +306,33 @@ export async function createPerson(input: PersonCreateInput) {
   const now = new Date();
   const passwordHash = await hash(input.password, 10);
 
+  let parentId: number | null = null;
+  if (input.role === "Surveyor") {
+    if (input.parent_id == null) throw new Error("PARENT_RO_REQUIRED");
+    await assertValidRoParent(input.parent_id);
+    parentId = input.parent_id;
+  }
+
+  // RO / Surveyor need HO approve before login. HO / Admin auto-verified.
+  const needsApproval = input.role === "RO" || input.role === "Surveyor";
+
   const user = await db.users.create({
     data: {
       first_name: input.first_name,
       last_name: input.last_name,
       email: input.email,
       city_id: input.city,
+      parent_id: parentId,
       password: passwordHash,
       type: fields.type,
       is_admin: fields.is_admin,
-      verified_at: now,
+      verified_at: needsApproval ? null : now,
       status: "Active",
       is_deleted: 0,
       created_at: now,
       updated_at: now,
     },
-    select: { id: true },
+    select: { id: true, verified_at: true },
   });
 
   await upsertPhone(user.id, input.phone);
@@ -279,6 +362,13 @@ export async function updatePerson(
   });
   if (emailTaken) throw new Error("EMAIL_TAKEN");
 
+  let parentId: number | null = null;
+  if (input.role === "Surveyor") {
+    if (input.parent_id == null) throw new Error("PARENT_RO_REQUIRED");
+    await assertValidRoParent(input.parent_id);
+    parentId = input.parent_id;
+  }
+
   const fields = dbFieldsForRole(input.role);
   await db.users.update({
     where: { id: input.id },
@@ -287,6 +377,7 @@ export async function updatePerson(
       last_name: input.last_name,
       email: input.email,
       city_id: input.city,
+      parent_id: parentId,
       type: fields.type,
       is_admin: fields.is_admin,
       updated_at: new Date(),
@@ -328,6 +419,8 @@ export async function registerSurveyor(input: RegisterSurveyorInput) {
   });
   if (!city) throw new Error("INVALID_CITY");
 
+  await assertValidRoParent(input.parent_id);
+
   const existing = await db.users.findFirst({
     where: { email: input.email },
     select: { id: true },
@@ -343,6 +436,7 @@ export async function registerSurveyor(input: RegisterSurveyorInput) {
       last_name: input.last_name,
       email: input.email,
       city_id: input.city_id,
+      parent_id: input.parent_id,
       password: passwordHash,
       type: "Surveyor",
       is_admin: 0,
@@ -358,25 +452,37 @@ export async function registerSurveyor(input: RegisterSurveyorInput) {
       first_name: true,
       last_name: true,
       type: true,
+      parent_id: true,
       verified_at: true,
     },
   });
 }
 
 export async function listCitiesForRegister() {
-  return getPersonLookups();
+  const lookups = await getPersonLookups();
+  return lookups.cities;
 }
 
 export async function approveSurveyor(agentId: number) {
-  const updated = await db.users.updateMany({
+  const user = await db.users.findFirst({
     where: {
       id: agentId,
       type: { in: ["RO", "Surveyor"] },
       is_deleted: 0,
     },
+    select: { id: true, type: true, parent_id: true },
+  });
+  if (!user) throw new Error("NOT_FOUND");
+
+  if (user.type === "Surveyor") {
+    if (user.parent_id == null) throw new Error("PARENT_RO_REQUIRED");
+    await assertValidRoParent(user.parent_id);
+  }
+
+  await db.users.update({
+    where: { id: user.id },
     data: { verified_at: new Date(), updated_at: new Date() },
   });
-  if (updated.count === 0) throw new Error("NOT_FOUND");
 }
 
 export async function changeStaffPassword(input: StaffPasswordInput) {
@@ -408,10 +514,14 @@ export async function changePersonPassword(
   });
 }
 
+/** HO + RO for soft permission assignment by Admin. Surveyors use hard ceiling. */
 export async function listHoStaffForPermissions() {
   return db.users.findMany({
-    where: { type: "HO", is_deleted: 0 },
-    orderBy: [{ first_name: "asc" }, { last_name: "asc" }, { email: "asc" }],
+    where: {
+      is_deleted: 0,
+      OR: [{ type: "HO" }, { type: "RO" }],
+    },
+    orderBy: [{ type: "asc" }, { first_name: "asc" }, { last_name: "asc" }],
     select: {
       id: true,
       first_name: true,
@@ -478,6 +588,28 @@ export async function saveStaffPermissions(
   input: SavePermissionsInput,
   actorId: number,
 ) {
+  const staff = await db.users.findFirst({
+    where: { id: input.staff_id, is_deleted: 0 },
+    select: { id: true, type: true, parent_id: true },
+  });
+  if (!staff) throw new Error("NOT_FOUND");
+
+  let permissions = input.permissions;
+  if (staff.type === "Surveyor") {
+    // Hard ceiling + never above parent RO grants
+    permissions = clampSurveyorPermissions(permissions);
+    if (staff.parent_id != null) {
+      const parentPerms = await db.user_permissions.findMany({
+        where: { user_id: staff.parent_id, is_deleted: 0 },
+        select: { permission: true },
+      });
+      if (parentPerms.length > 0) {
+        const parentSet = new Set(parentPerms.map((p) => p.permission));
+        permissions = permissions.filter((p) => parentSet.has(p));
+      }
+    }
+  }
+
   const now = new Date();
   await db.user_permissions.updateMany({
     where: { user_id: input.staff_id, is_deleted: 0 },
@@ -488,10 +620,10 @@ export async function saveStaffPermissions(
     },
   });
 
-  if (input.permissions.length === 0) return;
+  if (permissions.length === 0) return;
 
   await db.user_permissions.createMany({
-    data: input.permissions.map((permission) => ({
+    data: permissions.map((permission) => ({
       user_id: input.staff_id,
       permission,
       is_deleted: 0,

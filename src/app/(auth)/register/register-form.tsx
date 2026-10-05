@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -17,13 +17,28 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 type CityOption = { id: number; name: string };
+type RoOption = { id: number; name: string; city_id: number | null };
 
-export function RegisterForm({ cities }: { cities: CityOption[] }) {
+export function RegisterForm({
+  cities,
+  ros,
+}: {
+  cities: CityOption[];
+  ros: RoOption[];
+}) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
+  const [cityId, setCityId] = useState("");
+  const [parentId, setParentId] = useState("");
   const [fieldErrors, setFieldErrors] = useState<
     Record<string, string[] | undefined>
   >({});
+
+  const rosForCity = useMemo(() => {
+    if (!cityId) return ros;
+    const cid = Number(cityId);
+    return ros.filter((r) => r.city_id == null || r.city_id === cid);
+  }, [ros, cityId]);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -35,6 +50,7 @@ export function RegisterForm({ cities }: { cities: CityOption[] }) {
       last_name: String(fd.get("last_name") ?? ""),
       email: String(fd.get("email") ?? ""),
       city_id: Number(fd.get("city_id")),
+      parent_id: Number(fd.get("parent_id")),
       password: String(fd.get("password") ?? ""),
       password_confirmation: String(fd.get("password_confirmation") ?? ""),
     };
@@ -52,7 +68,7 @@ export function RegisterForm({ cities }: { cities: CityOption[] }) {
       }
       toast.success(
         json.message ||
-          "Registration completed. Please wait for account verification.",
+          "Registration completed. Wait for HO approval before login.",
       );
       router.push("/login");
     } catch (err) {
@@ -70,8 +86,8 @@ export function RegisterForm({ cities }: { cities: CityOption[] }) {
         </p>
         <CardTitle className="text-2xl">Create an account</CardTitle>
         <CardDescription>
-          Self-signup as Surveyor. An HO admin must verify your account before
-          you can work cases.
+          Self-signup as Surveyor under a verified RO. HO must approve before
+          login.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -118,7 +134,11 @@ export function RegisterForm({ cities }: { cities: CityOption[] }) {
               name="city_id"
               required
               className="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs focus-visible:ring-2 focus-visible:outline-none"
-              defaultValue=""
+              value={cityId}
+              onChange={(e) => {
+                setCityId(e.target.value);
+                setParentId("");
+              }}
             >
               <option value="" disabled>
                 Select city
@@ -131,6 +151,39 @@ export function RegisterForm({ cities }: { cities: CityOption[] }) {
             </select>
             {fieldErrors.city_id?.[0] ? (
               <p className="text-sm text-destructive">{fieldErrors.city_id[0]}</p>
+            ) : null}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="parent_id">Parent RO</Label>
+            <select
+              id="parent_id"
+              name="parent_id"
+              required
+              className="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs focus-visible:ring-2 focus-visible:outline-none"
+              value={parentId}
+              onChange={(e) => setParentId(e.target.value)}
+              disabled={!cityId}
+            >
+              <option value="" disabled>
+                {cityId ? "Select RO…" : "Select city first"}
+              </option>
+              {rosForCity.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+            {cityId && rosForCity.length === 0 ? (
+              <p className="text-xs text-amber-700">
+                No verified RO for this city. Ask HO to create/approve an RO
+                first.
+              </p>
+            ) : null}
+            {fieldErrors.parent_id?.[0] ? (
+              <p className="text-sm text-destructive">
+                {fieldErrors.parent_id[0]}
+              </p>
             ) : null}
           </div>
 
@@ -171,7 +224,7 @@ export function RegisterForm({ cities }: { cities: CityOption[] }) {
             ) : null}
           </div>
 
-          <Button type="submit" disabled={pending} className="w-full">
+          <Button type="submit" disabled={pending || !parentId} className="w-full">
             {pending ? "Submitting…" : "Register"}
           </Button>
 

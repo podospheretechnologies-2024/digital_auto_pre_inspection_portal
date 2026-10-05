@@ -6,11 +6,11 @@ export function SurveyorsPage() {
   return (
     <PeopleCrudPage
       title="Surveyors"
-      description="RO and Surveyor accounts — create, edit, approve, delete"
+      description="Create RO first, then Surveyor linked to that RO. Approve before login. Case assign uses RO → linked Surveyors only."
       apiPath="/api/v2/account/surveyors"
       queryKey="account-surveyors"
       roleOptions={["RO", "Surveyor"]}
-      defaultRole="Surveyor"
+      defaultRole="RO"
       showApprove
       addLabel="Add RO / Surveyor"
     />
