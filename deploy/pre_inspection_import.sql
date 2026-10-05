@@ -1405,6 +1405,10 @@ CREATE TABLE IF NOT EXISTS `tbl_jobs` (
   `updated_user_id` int(11) DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `is_deleted` tinyint(4) NOT NULL DEFAULT 0,
+  `on_hold` tinyint(4) NOT NULL DEFAULT 0,
+  `assigned_at` timestamp NULL DEFAULT NULL,
+  `hold_at` timestamp NULL DEFAULT NULL,
+  `cancelled_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC;
 

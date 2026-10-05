@@ -13,6 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -58,6 +59,10 @@ export function ModelsMasterPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [name, setName] = useState("");
   const [companyId, setCompanyId] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
 
   const companiesQuery = useQuery({
     queryKey: ["masters-companies"],
@@ -171,11 +176,9 @@ export function ModelsMasterPage() {
                       <Button
                         size="sm"
                         variant="destructive"
-                        onClick={() => {
-                          if (confirm(`Delete model "${row.name}"?`)) {
-                            deleteMutation.mutate(row.id);
-                          }
-                        }}
+                        onClick={() =>
+                          setDeleteTarget({ id: row.id, name: row.name })
+                        }
                       >
                         Delete
                       </Button>
@@ -232,6 +235,28 @@ export function ModelsMasterPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={deleteTarget != null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        tone="danger"
+        title="Delete model?"
+        description={
+          deleteTarget
+            ? `“${deleteTarget.name}” will be removed. This cannot be undone.`
+            : undefined
+        }
+        confirmLabel="Delete"
+        loading={deleteMutation.isPending}
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          deleteMutation.mutate(deleteTarget.id, {
+            onSettled: () => setDeleteTarget(null),
+          });
+        }}
+      />
     </>
   );
 }

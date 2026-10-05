@@ -13,6 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -67,6 +68,10 @@ export function VariantsMasterPage() {
   const [vehicleType, setVehicleType] = useState<(typeof vehicleTypes)[number]>(
     "4 Wheeler",
   );
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
 
   const companiesQuery = useQuery({
     queryKey: ["masters-companies"],
@@ -210,11 +215,9 @@ export function VariantsMasterPage() {
                       <Button
                         size="sm"
                         variant="destructive"
-                        onClick={() => {
-                          if (confirm(`Delete variant "${row.name}"?`)) {
-                            deleteMutation.mutate(row.id);
-                          }
-                        }}
+                        onClick={() =>
+                          setDeleteTarget({ id: row.id, name: row.name })
+                        }
                       >
                         Delete
                       </Button>
@@ -315,6 +318,28 @@ export function VariantsMasterPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={deleteTarget != null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        tone="danger"
+        title="Delete variant?"
+        description={
+          deleteTarget
+            ? `“${deleteTarget.name}” will be removed. This cannot be undone.`
+            : undefined
+        }
+        confirmLabel="Delete"
+        loading={deleteMutation.isPending}
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          deleteMutation.mutate(deleteTarget.id, {
+            onSettled: () => setDeleteTarget(null),
+          });
+        }}
+      />
     </>
   );
 }

@@ -14,7 +14,10 @@ export type QcQueueItem = {
   valuation_price: number | null;
   ownership_name: string | null;
   qc: number;
+  /** When submitted to QC (inspection created) */
   created_at: Date | null;
+  /** When QC approved / completed */
+  qc_datetime: Date | null;
   cdate: Date | null;
   cname: string | null;
   mobileno: string | null;
@@ -40,6 +43,7 @@ async function enrichQcRows(
     ownership_name: string | null;
     qc: number;
     created_at: Date | null;
+    qc_datetime?: Date | null;
   }>,
 ): Promise<QcQueueItem[]> {
   if (rows.length === 0) return [];
@@ -84,6 +88,7 @@ async function enrichQcRows(
       ownership_name: row.ownership_name,
       qc: row.qc,
       created_at: row.created_at,
+      qc_datetime: row.qc_datetime ?? null,
       cdate: job?.cdate ?? null,
       cname: job?.cname ?? null,
       mobileno: job?.mobileno ?? null,
@@ -123,6 +128,7 @@ export async function listQcQueue(opts?: {
     ownership_name: true,
     qc: true,
     created_at: true,
+    qc_datetime: true,
   } as const;
 
   for (const kind of kinds) {
@@ -245,6 +251,7 @@ export async function listQcDone(opts?: {
     ownership_name: true,
     qc: true,
     created_at: true,
+    qc_datetime: true,
   } as const;
 
   const rows =
@@ -307,6 +314,7 @@ export async function searchPreInspectionReports(opts: {
               ownership_name: true,
               qc: true,
               created_at: true,
+              qc_datetime: true,
             },
           })
         : kind === "3wheeler"
@@ -330,6 +338,7 @@ export async function searchPreInspectionReports(opts: {
                 ownership_name: true,
                 qc: true,
                 created_at: true,
+                qc_datetime: true,
               },
             })
           : await db.tbl_4wheeler.findMany({
@@ -352,6 +361,7 @@ export async function searchPreInspectionReports(opts: {
                 ownership_name: true,
                 qc: true,
                 created_at: true,
+                qc_datetime: true,
               },
             });
 

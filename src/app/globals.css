@@ -222,5 +222,7 @@
   }
   html {
     @apply font-sans;
+    /* Slightly denser UI at 100% browser zoom (~15px root) */
+    font-size: 93.75%;
   }
 }

@@ -1,21 +1,26 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 import { RegPlate } from "@/components/atlas/reg-plate";
-import { jobStatusPill, StatusPill } from "@/components/atlas/status-pill";
-import { PageHeader } from "@/components/layout/page-header";
-import { WorkflowStrip } from "@/components/jobs/workflow-strip";
-import { Button } from "@/components/ui/button";
 import {
-  Table,
+  JobActionButton,
+  JobActions,
+  JobDtiCell,
+  JobSerialCell,
+  JobSerialHead,
+  JobsListingCard,
+  JobsTable,
+  JobsTableCell,
+  JobsTableHead,
+  JobsTableHeader,
+  JobsTableRow,
   TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+} from "@/components/jobs/jobs-listing";
+import { PageHeader } from "@/components/layout/page-header";
+import { formatDeskDate } from "@/lib/jobs/helpers";
 
 type Row = {
   id: number;
@@ -25,6 +30,8 @@ type Row = {
   cname: string | null;
   bankname?: string;
   agent_name?: string;
+  cancelled_at?: string | null;
+  updated_at?: string | null;
 };
 
 async function apiJson<T>(url: string, init?: RequestInit): Promise<T> {
@@ -64,77 +71,81 @@ export function CancelCasesPage() {
     <>
       <PageHeader
         title="Cancel"
-        description="Cancelled cases — restore optionally back to Fresh / Assign flow"
+        description="Cancelled cases. Restore a case if it should return to the active workflow."
+        eyebrow="Workflow"
+        badge="Cancelled"
       />
-      <WorkflowStrip active="cancelled" />
 
-      {listQuery.isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : (
-        <div className="rounded-xl border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>DTI</TableHead>
-                <TableHead>Vehicle</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Bank</TableHead>
-                <TableHead>Agent</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
+      <JobsListingCard
+        title="Cancelled cases"
+        description="Restore a case to send it back into the active workflow"
+        count={rows.length}
+        loading={listQuery.isLoading}
+        error={
+          listQuery.isError ? (listQuery.error as Error).message : null
+        }
+        empty="No cancelled cases"
+      >
+        {rows.length > 0 ? (
+          <JobsTable>
+            <JobsTableHeader>
+              <JobsTableRow>
+                <JobSerialHead />
+                <JobsTableHead>DTI</JobsTableHead>
+                <JobsTableHead>Vehicle</JobsTableHead>
+                <JobsTableHead>Customer</JobsTableHead>
+                <JobsTableHead>Bank</JobsTableHead>
+                <JobsTableHead>Agent</JobsTableHead>
+                <JobsTableHead>Date</JobsTableHead>
+                <JobsTableHead className="text-right">Actions</JobsTableHead>
+              </JobsTableRow>
+            </JobsTableHeader>
             <TableBody>
-              {rows.map((row) => {
-                const pill = jobStatusPill(row.status);
-                return (
-                  <TableRow key={row.id}>
-                    <TableCell className="font-medium">
-                      {row.dti_no ?? row.id}
-                    </TableCell>
-                    <TableCell>
-                      {row.vehicleno ? (
-                        <RegPlate value={row.vehicleno} />
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                    <TableCell>{row.cname ?? "—"}</TableCell>
-                    <TableCell>{row.bankname ?? "—"}</TableCell>
-                    <TableCell>{row.agent_name ?? "—"}</TableCell>
-                    <TableCell>
-                      {pill ? (
-                        <StatusPill tone={pill.tone}>{pill.label}</StatusPill>
-                      ) : (
-                        "Cancelled"
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        size="sm"
+              {rows.map((row, index) => (
+                <JobsTableRow key={row.id}>
+                  <JobSerialCell index={index} />
+                  <JobsTableCell>
+                    <JobDtiCell value={row.dti_no ?? row.id} />
+                  </JobsTableCell>
+                  <JobsTableCell>
+                    {row.vehicleno ? (
+                      <RegPlate value={row.vehicleno} />
+                    ) : (
+                      "—"
+                    )}
+                  </JobsTableCell>
+                  <JobsTableCell className="font-medium">
+                    {row.cname ?? "—"}
+                  </JobsTableCell>
+                  <JobsTableCell>
+                    <div
+                      className="max-w-[140px] truncate"
+                      title={row.bankname}
+                    >
+                      {row.bankname ?? "—"}
+                    </div>
+                  </JobsTableCell>
+                  <JobsTableCell>{row.agent_name ?? "—"}</JobsTableCell>
+                  <JobsTableCell className="tabular-nums text-muted-foreground">
+                    {formatDeskDate(row.cancelled_at ?? row.updated_at)}
+                  </JobsTableCell>
+                  <JobsTableCell>
+                    <JobActions>
+                      <JobActionButton
+                        tone="success"
+                        icon={RotateCcw}
+                        label="Restore"
                         disabled={restoreMutation.isPending}
                         onClick={() => restoreMutation.mutate(row.id)}
-                      >
-                        Restore
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-              {rows.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={7}
-                    className="text-center text-muted-foreground"
-                  >
-                    No cancelled cases.
-                  </TableCell>
-                </TableRow>
-              ) : null}
+                      />
+                    </JobActions>
+                  </JobsTableCell>
+                </JobsTableRow>
+              ))}
             </TableBody>
-          </Table>
-        </div>
-      )}
+          </JobsTable>
+        ) : null}
+      </JobsListingCard>
     </>
   );
 }

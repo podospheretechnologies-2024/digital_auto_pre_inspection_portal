@@ -1525,6 +1525,12 @@ model tbl_jobs {
   updated_at DateTime?
   is_deleted Int @default(0) @db.TinyInt
   on_hold Int @default(0) @db.TinyInt
+  /// When surveyor/RO was assigned (Assign Case desk)
+  assigned_at DateTime?
+  /// When case was put on Hold
+  hold_at DateTime?
+  /// When case was Cancelled
+  cancelled_at DateTime?
 
   @@map("tbl_jobs")
 }
