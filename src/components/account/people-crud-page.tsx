@@ -1,6 +1,14 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  Ban,
+  CheckCircle2,
+  KeyRound,
+  Pencil,
+  Power,
+  Trash2,
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -8,6 +16,10 @@ import { StatusPill } from "@/components/atlas/status-pill";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  CrudActionButton,
+  CrudActionGroup,
+} from "@/components/ui/crud-action-button";
 import {
   Dialog,
   DialogContent,
@@ -40,8 +52,14 @@ type Row = {
   parent_name: string | null;
   phone: string | null;
   verified_at: string | null;
+  status: string | null;
   is_online: number;
 };
+
+function isInactiveStatus(status: string | null | undefined) {
+  const value = String(status ?? "Active").trim().toLowerCase();
+  return value === "inactive" || value === "0";
+}
 
 type Lookup = { id: number; name: string; city_id?: number | null };
 
@@ -83,6 +101,8 @@ export function PeopleCrudPage({
   defaultRole,
   showApprove,
   showOnline,
+  showResetPassword,
+  showDeactivate,
   addLabel,
 }: {
   title: string;
@@ -93,6 +113,8 @@ export function PeopleCrudPage({
   defaultRole: PersonRole;
   showApprove?: boolean;
   showOnline?: boolean;
+  showResetPassword?: boolean;
+  showDeactivate?: boolean;
   addLabel: string;
 }) {
   const queryClient = useQueryClient();
@@ -106,6 +128,15 @@ export function PeopleCrudPage({
     id: number;
     name: string;
   } | null>(null);
+  const [deactivateTarget, setDeactivateTarget] = useState<{
+    id: number;
+    name: string;
+    next: "Active" | "Inactive";
+  } | null>(null);
+  const canResetPassword = Boolean(showResetPassword || defaultRole === "HO");
+  const isHoStaff = defaultRole === "HO";
+  /** Hide empty Parent RO column on HO Staff only */
+  const showParentRoColumn = !isHoStaff;
 
   const listQuery = useQuery({
     queryKey: [queryKey],
@@ -183,11 +214,14 @@ export function PeopleCrudPage({
       });
     },
     onSuccess: async (res) => {
+      const msg = (res as { message?: string })?.message;
       toast.success(
         editingId
           ? "Updated"
-          : (res as { message?: string })?.message ||
-              "Created — approve before login",
+          : msg ||
+              (showApprove
+                ? "Created — approve before login"
+                : "Created"),
       );
       setOpen(false);
       setEditingId(null);
@@ -233,11 +267,27 @@ export function PeopleCrudPage({
           password_confirmation: passwordConfirmation,
         }),
       }),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Password updated");
       setPwdId(null);
       setPassword("");
       setPasswordConfirmation("");
+      await queryClient.invalidateQueries({ queryKey: [queryKey] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: (input: { id: number; status: "Active" | "Inactive" }) =>
+      apiJson(apiPath, {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: async (_res, vars) => {
+      toast.success(
+        vars.status === "Inactive" ? "Deactivated" : "Activated",
+      );
+      await queryClient.invalidateQueries({ queryKey: [queryKey] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -251,7 +301,7 @@ export function PeopleCrudPage({
     (form.role || defaultRole) &&
     (!needsParentRo || form.parent_id) &&
     (editingId ||
-      (form.password &&
+      (form.password.length >= 8 &&
         form.password_confirmation &&
         form.password === form.password_confirmation)) &&
     !saveMutation.isPending;
@@ -277,8 +327,8 @@ export function PeopleCrudPage({
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Parent RO</TableHead>
+                {!isHoStaff ? <TableHead>Role</TableHead> : null}
+                {showParentRoColumn ? <TableHead>Parent RO</TableHead> : null}
                 <TableHead>City</TableHead>
                 <TableHead>Phone</TableHead>
                 {showApprove ? <TableHead>Status</TableHead> : null}
@@ -293,17 +343,21 @@ export function PeopleCrudPage({
                     {row.first_name} {row.last_name}
                   </TableCell>
                   <TableCell>{row.email}</TableCell>
-                  <TableCell>{row.role}</TableCell>
-                  <TableCell>
-                    {row.role === "Surveyor"
-                      ? (row.parent_name ?? "—")
-                      : "—"}
-                  </TableCell>
+                  {!isHoStaff ? <TableCell>{row.role}</TableCell> : null}
+                  {showParentRoColumn ? (
+                    <TableCell>
+                      {row.role === "Surveyor"
+                        ? (row.parent_name ?? "—")
+                        : "—"}
+                    </TableCell>
+                  ) : null}
                   <TableCell>{row.city ?? "—"}</TableCell>
                   <TableCell>{row.phone ?? "—"}</TableCell>
                   {showApprove ? (
                     <TableCell>
-                      {row.verified_at ? (
+                      {isInactiveStatus(row.status) ? (
+                        <StatusPill tone="bad">Inactive</StatusPill>
+                      ) : row.verified_at ? (
                         <StatusPill tone="ok">Verified</StatusPill>
                       ) : (
                         <StatusPill tone="warn">Pending</StatusPill>
@@ -311,54 +365,100 @@ export function PeopleCrudPage({
                     </TableCell>
                   ) : null}
                   {showOnline ? (
-                    <TableCell>{row.is_online ? "Yes" : "No"}</TableCell>
+                    <TableCell>
+                      {isHoStaff ? (
+                        row.is_online ? (
+                          <StatusPill tone="ok">Online</StatusPill>
+                        ) : (
+                          <StatusPill tone="neutral">Offline</StatusPill>
+                        )
+                      ) : row.is_online ? (
+                        "Yes"
+                      ) : (
+                        "No"
+                      )}
+                    </TableCell>
                   ) : null}
-                  <TableCell className="space-x-1 text-right">
-                    {showApprove && !row.verified_at ? (
-                      <Button
-                        size="sm"
-                        disabled={approveMutation.isPending}
-                        onClick={() => approveMutation.mutate(row.id)}
-                      >
-                        Approve
-                      </Button>
-                    ) : null}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => openEdit(row)}
-                    >
-                      Edit
-                    </Button>
-                    {defaultRole === "HO" ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setPwdId(row.id)}
-                      >
-                        Password
-                      </Button>
-                    ) : null}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={deleteMutation.isPending}
-                      onClick={() =>
-                        setDeleteTarget({
-                          id: row.id,
-                          name: `${row.first_name} ${row.last_name}`.trim(),
-                        })
-                      }
-                    >
-                      Delete
-                    </Button>
+                  <TableCell className="text-right">
+                    <CrudActionGroup>
+                      {showApprove &&
+                      !row.verified_at &&
+                      !isInactiveStatus(row.status) ? (
+                        <CrudActionButton
+                          tone="approve"
+                          icon={CheckCircle2}
+                          label="Approve"
+                          disabled={approveMutation.isPending}
+                          onClick={() => approveMutation.mutate(row.id)}
+                        />
+                      ) : null}
+                      <CrudActionButton
+                        tone="edit"
+                        icon={Pencil}
+                        label="Edit"
+                        onClick={() => openEdit(row)}
+                      />
+                      {canResetPassword ? (
+                        <CrudActionButton
+                          tone="password"
+                          icon={KeyRound}
+                          label="Reset Password"
+                          onClick={() => setPwdId(row.id)}
+                        />
+                      ) : null}
+                      {showDeactivate ? (
+                        <CrudActionButton
+                          tone={
+                            isInactiveStatus(row.status)
+                              ? "activate"
+                              : "deactivate"
+                          }
+                          icon={
+                            isInactiveStatus(row.status) ? Power : Ban
+                          }
+                          label={
+                            isInactiveStatus(row.status)
+                              ? "Activate"
+                              : "Deactivate"
+                          }
+                          disabled={statusMutation.isPending}
+                          onClick={() =>
+                            setDeactivateTarget({
+                              id: row.id,
+                              name: `${row.first_name} ${row.last_name}`.trim(),
+                              next: isInactiveStatus(row.status)
+                                ? "Active"
+                                : "Inactive",
+                            })
+                          }
+                        />
+                      ) : null}
+                      <CrudActionButton
+                        tone="delete"
+                        icon={Trash2}
+                        label="Delete"
+                        disabled={deleteMutation.isPending}
+                        onClick={() =>
+                          setDeleteTarget({
+                            id: row.id,
+                            name: `${row.first_name} ${row.last_name}`.trim(),
+                          })
+                        }
+                      />
+                    </CrudActionGroup>
                   </TableCell>
                 </TableRow>
               ))}
               {rows.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={9}
+                    colSpan={
+                      5 +
+                      (isHoStaff ? 0 : 1) +
+                      (showParentRoColumn ? 1 : 0) +
+                      (showApprove ? 1 : 0) +
+                      (showOnline ? 1 : 0)
+                    }
                     className="text-center text-muted-foreground"
                   >
                     No records.
@@ -488,6 +588,11 @@ export function PeopleCrudPage({
                       setForm((f) => ({ ...f, password: e.target.value }))
                     }
                   />
+                  {isHoStaff ? (
+                    <p className="text-[11px] text-muted-foreground">
+                      At least 8 characters
+                    </p>
+                  ) : null}
                 </div>
                 <div className="space-y-1.5">
                   <Label>Confirm password</Label>
@@ -527,7 +632,9 @@ export function PeopleCrudPage({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Change password</DialogTitle>
+            <DialogTitle>
+              {showResetPassword ? "Reset password" : "Change password"}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
@@ -554,6 +661,7 @@ export function PeopleCrudPage({
             <Button
               disabled={
                 !password ||
+                password.length < 6 ||
                 password !== passwordConfirmation ||
                 pwdMutation.isPending
               }
@@ -564,6 +672,37 @@ export function PeopleCrudPage({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={deactivateTarget != null}
+        onOpenChange={(open) => {
+          if (!open) setDeactivateTarget(null);
+        }}
+        tone={deactivateTarget?.next === "Inactive" ? "danger" : "default"}
+        title={
+          deactivateTarget?.next === "Inactive"
+            ? "Deactivate user?"
+            : "Activate user?"
+        }
+        description={
+          deactivateTarget
+            ? deactivateTarget.next === "Inactive"
+              ? `“${deactivateTarget.name}” will be deactivated and cannot log in.`
+              : `“${deactivateTarget.name}” will be activated and can log in again (if verified).`
+            : undefined
+        }
+        confirmLabel={
+          deactivateTarget?.next === "Inactive" ? "Deactivate" : "Activate"
+        }
+        loading={statusMutation.isPending}
+        onConfirm={() => {
+          if (!deactivateTarget) return;
+          statusMutation.mutate(
+            { id: deactivateTarget.id, status: deactivateTarget.next },
+            { onSettled: () => setDeactivateTarget(null) },
+          );
+        }}
+      />
 
       <ConfirmDialog
         open={deleteTarget != null}

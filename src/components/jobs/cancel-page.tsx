@@ -2,9 +2,12 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { RotateCcw } from "lucide-react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { RegPlate } from "@/components/atlas/reg-plate";
+import { CaseListToolbar } from "@/components/jobs/case-list-toolbar";
+import { JobHistoryButton } from "@/components/jobs/job-history-button";
 import {
   JobActionButton,
   JobActions,
@@ -20,6 +23,12 @@ import {
   TableBody,
 } from "@/components/jobs/jobs-listing";
 import { PageHeader } from "@/components/layout/page-header";
+import {
+  EMPTY_CASE_FILTERS,
+  filterCaseRows,
+  uniqueSorted,
+  type CaseListFilterState,
+} from "@/lib/jobs/case-list-filters";
 import { formatDeskDate } from "@/lib/jobs/helpers";
 
 type Row = {
@@ -30,6 +39,11 @@ type Row = {
   cname: string | null;
   bankname?: string;
   agent_name?: string;
+  created_at?: string | null;
+  assigned_at?: string | null;
+  inspection_at?: string | null;
+  qc_datetime?: string | null;
+  hold_at?: string | null;
   cancelled_at?: string | null;
   updated_at?: string | null;
 };
@@ -46,6 +60,7 @@ async function apiJson<T>(url: string, init?: RequestInit): Promise<T> {
 
 export function CancelCasesPage() {
   const queryClient = useQueryClient();
+  const [filters, setFilters] = useState<CaseListFilterState>(EMPTY_CASE_FILTERS);
   const listQuery = useQuery({
     queryKey: ["jobs-cancel"],
     queryFn: () =>
@@ -65,7 +80,19 @@ export function CancelCasesPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const rows = listQuery.data?.data ?? [];
+  const allRows = listQuery.data?.data ?? [];
+  const banks = useMemo(
+    () => uniqueSorted(allRows.map((r) => r.bankname)),
+    [allRows],
+  );
+  const surveyors = useMemo(
+    () => uniqueSorted(allRows.map((r) => r.agent_name)),
+    [allRows],
+  );
+  const rows = useMemo(
+    () => filterCaseRows(allRows, filters, "cancelled"),
+    [allRows, filters],
+  );
 
   return (
     <>
@@ -77,14 +104,27 @@ export function CancelCasesPage() {
       />
 
       <JobsListingCard
-        title="Cancelled cases"
+        title="Case list"
         description="Restore a case to send it back into the active workflow"
         count={rows.length}
+        totalCount={allRows.length}
         loading={listQuery.isLoading}
         error={
           listQuery.isError ? (listQuery.error as Error).message : null
         }
-        empty="No cancelled cases"
+        empty={
+          allRows.length > 0
+            ? "No cases match these filters"
+            : "No cancelled cases"
+        }
+        filters={
+          <CaseListToolbar
+            value={filters}
+            onChange={setFilters}
+            banks={banks}
+            surveyors={surveyors}
+          />
+        }
       >
         {rows.length > 0 ? (
           <JobsTable>
@@ -138,6 +178,7 @@ export function CancelCasesPage() {
                         disabled={restoreMutation.isPending}
                         onClick={() => restoreMutation.mutate(row.id)}
                       />
+                      <JobHistoryButton stage="cancel" job={row} />
                     </JobActions>
                   </JobsTableCell>
                 </JobsTableRow>

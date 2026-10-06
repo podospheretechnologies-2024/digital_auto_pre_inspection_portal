@@ -2,10 +2,12 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ban, Eye, Play } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { RegPlate } from "@/components/atlas/reg-plate";
+import { CaseListToolbar } from "@/components/jobs/case-list-toolbar";
+import { JobHistoryButton } from "@/components/jobs/job-history-button";
 import {
   JobActionButton,
   JobActionLink,
@@ -23,6 +25,12 @@ import {
 } from "@/components/jobs/jobs-listing";
 import { PageHeader } from "@/components/layout/page-header";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  EMPTY_CASE_FILTERS,
+  filterCaseRows,
+  uniqueSorted,
+  type CaseListFilterState,
+} from "@/lib/jobs/case-list-filters";
 import { formatDeskDate, inspectPathForJob } from "@/lib/jobs/helpers";
 
 type Row = {
@@ -35,6 +43,9 @@ type Row = {
   agent_name?: string;
   vehicle_type: string | null;
   inspection_id?: number | null;
+  created_at?: string | null;
+  assigned_at?: string | null;
+  inspection_at?: string | null;
   hold_at?: string | null;
   updated_at?: string | null;
 };
@@ -52,6 +63,7 @@ async function apiJson<T>(url: string, init?: RequestInit): Promise<T> {
 export function HoldCasesPage() {
   const queryClient = useQueryClient();
   const [cancelId, setCancelId] = useState<number | null>(null);
+  const [filters, setFilters] = useState<CaseListFilterState>(EMPTY_CASE_FILTERS);
   const listQuery = useQuery({
     queryKey: ["jobs-hold"],
     queryFn: () =>
@@ -77,7 +89,19 @@ export function HoldCasesPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const rows = listQuery.data?.data ?? [];
+  const allRows = listQuery.data?.data ?? [];
+  const banks = useMemo(
+    () => uniqueSorted(allRows.map((r) => r.bankname)),
+    [allRows],
+  );
+  const surveyors = useMemo(
+    () => uniqueSorted(allRows.map((r) => r.agent_name)),
+    [allRows],
+  );
+  const rows = useMemo(
+    () => filterCaseRows(allRows, filters, "hold"),
+    [allRows, filters],
+  );
 
   return (
     <>
@@ -89,14 +113,27 @@ export function HoldCasesPage() {
       />
 
       <JobsListingCard
-        title="Cases on hold"
+        title="Case list"
         description="Resume work or cancel cases that are no longer required"
         count={rows.length}
+        totalCount={allRows.length}
         loading={listQuery.isLoading}
         error={
           listQuery.isError ? (listQuery.error as Error).message : null
         }
-        empty="No cases on hold"
+        empty={
+          allRows.length > 0
+            ? "No cases match these filters"
+            : "No cases on hold"
+        }
+        filters={
+          <CaseListToolbar
+            value={filters}
+            onChange={setFilters}
+            banks={banks}
+            surveyors={surveyors}
+          />
+        }
       >
         {rows.length > 0 ? (
           <JobsTable>
@@ -139,7 +176,7 @@ export function HoldCasesPage() {
                           href={inspectPathForJob(row.id, row.vehicle_type, {
                             mode: row.inspection_id ? "edit" : "create",
                           })}
-                          tone="outline"
+                          tone="info"
                           icon={Eye}
                           label="Open"
                         />
@@ -155,6 +192,7 @@ export function HoldCasesPage() {
                             })
                           }
                         />
+                        <JobHistoryButton stage="hold" job={row} />
                         <JobActionButton
                           tone="danger"
                           icon={Ban}

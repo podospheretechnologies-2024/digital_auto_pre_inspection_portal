@@ -27,13 +27,28 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { adminNavGroups, ChevronRight } from "@/lib/nav-config";
+import { adminNavGroups, ChevronRight, type NavItem } from "@/lib/nav-config";
 import { cn } from "@/lib/utils";
 
 type AppSidebarProps = {
   userName: string;
   roleLabel: string;
+  /** Session role key: Admin | HO | RO | Surveyor | Bank */
+  userRole: string;
 };
+
+function canSeeNavItem(item: NavItem, userRole: string): boolean {
+  const access = item.access ?? "all";
+  if (access === "all") return true;
+  if (access === "adminOnly" || access === "admin") return userRole === "Admin";
+  if (access === "both") return userRole === "Admin" || userRole === "HO";
+  if (access === "adminHoBank") {
+    return (
+      userRole === "Admin" || userRole === "HO" || userRole === "Bank"
+    );
+  }
+  return true;
+}
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -59,7 +74,7 @@ function isItemActive(
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function AppSidebar({ userName, roleLabel }: AppSidebarProps) {
+export function AppSidebar({ userName, roleLabel, userRole }: AppSidebarProps) {
   const pathname = usePathname();
 
   return (
@@ -89,7 +104,13 @@ export function AppSidebar({ userName, roleLabel }: AppSidebarProps) {
       </SidebarHeader>
 
       <SidebarContent className="overflow-x-hidden px-4">
-        {adminNavGroups.map((group, gi) => (
+        {adminNavGroups.map((group, gi) => {
+          const items = group.items.filter((item) =>
+            canSeeNavItem(item, userRole),
+          );
+          if (items.length === 0) return null;
+
+          return (
           <SidebarGroup key={group.label ?? `top-${gi}`} className="px-0 py-1">
             {group.label ? (
               <SidebarGroupLabel className="h-auto px-3 pt-4 pb-1 text-xs leading-[21px] font-bold text-sidebar-foreground uppercase">
@@ -97,7 +118,7 @@ export function AppSidebar({ userName, roleLabel }: AppSidebarProps) {
               </SidebarGroupLabel>
             ) : null}
             <SidebarMenu className="gap-0.5">
-              {group.items.map((item) => {
+              {items.map((item) => {
                 const active = isItemActive(pathname, item.href, item.exact);
                 const Icon = item.icon;
 
@@ -125,7 +146,8 @@ export function AppSidebar({ userName, roleLabel }: AppSidebarProps) {
               })}
             </SidebarMenu>
           </SidebarGroup>
-        ))}
+          );
+        })}
       </SidebarContent>
 
       <SidebarFooter className="p-4">

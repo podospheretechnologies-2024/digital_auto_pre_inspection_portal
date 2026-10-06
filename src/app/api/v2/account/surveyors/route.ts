@@ -3,10 +3,13 @@ import { NextResponse } from "next/server";
 import {
   agentApproveSchema,
   approveSurveyor,
+  changePersonPassword,
   createPerson,
   getPersonLookups,
   listSurveyors,
+  setPersonStatus,
   softDeletePerson,
+  staffPasswordSchema,
   updatePerson,
 } from "@/lib/account/staff";
 import {
@@ -19,8 +22,14 @@ import {
   requireBothWithPermission,
   zodErrorResponse,
 } from "@/lib/api";
+import { z } from "zod";
 
 const ALLOWED: PersonRole[] = ["RO", "Surveyor"];
+
+const personStatusSchema = z.object({
+  id: z.coerce.number().int().positive(),
+  status: z.enum(["Active", "Inactive"]),
+});
 
 export async function GET() {
   const user = await requireBothWithPermission("surveyor_view");
@@ -132,6 +141,49 @@ export async function PUT(request: Request) {
   if (user instanceof NextResponse) return user;
 
   const body = await request.json();
+
+  // Reset password: { staff_id, password, password_confirmation }
+  if (body?.staff_id != null && body.password != null) {
+    const parsed = staffPasswordSchema.safeParse(body);
+    if (!parsed.success) return zodErrorResponse(parsed.error);
+    try {
+      await changePersonPassword(
+        parsed.data.staff_id,
+        parsed.data.password,
+        ALLOWED,
+      );
+      return NextResponse.json({ ok: true });
+    } catch (error) {
+      if (error instanceof Error && error.message === "NOT_FOUND") {
+        return NextResponse.json({ message: "Not found" }, { status: 404 });
+      }
+      console.error(error);
+      return NextResponse.json(
+        { message: "Password update failed" },
+        { status: 500 },
+      );
+    }
+  }
+
+  // Activate / deactivate: { id, status: "Active" | "Inactive" }
+  if (body?.status === "Active" || body?.status === "Inactive") {
+    const parsed = personStatusSchema.safeParse(body);
+    if (!parsed.success) return zodErrorResponse(parsed.error);
+    try {
+      await setPersonStatus(parsed.data.id, parsed.data.status, ALLOWED);
+      return NextResponse.json({ ok: true });
+    } catch (error) {
+      if (error instanceof Error && error.message === "NOT_FOUND") {
+        return NextResponse.json({ message: "Not found" }, { status: 404 });
+      }
+      console.error(error);
+      return NextResponse.json(
+        { message: "Status update failed" },
+        { status: 500 },
+      );
+    }
+  }
+
   const parsed = personUpdateSchema.safeParse(body);
   if (!parsed.success) return zodErrorResponse(parsed.error);
 

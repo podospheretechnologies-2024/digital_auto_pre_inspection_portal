@@ -1,10 +1,13 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Eye, FileText, Pencil } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { RegPlate } from "@/components/atlas/reg-plate";
+import { CaseListToolbar } from "@/components/jobs/case-list-toolbar";
+import { ChangeStageButton } from "@/components/jobs/change-stage-button";
+import { JobHistoryButton } from "@/components/jobs/job-history-button";
 import {
   JobActionLink,
   JobActions,
@@ -23,6 +26,12 @@ import {
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import {
+  EMPTY_CASE_FILTERS,
+  filterCaseRows,
+  uniqueSorted,
+  type CaseListFilterState,
+} from "@/lib/jobs/case-list-filters";
+import {
   inspectPathForJob,
   pdfPathForInspection,
   formatDeskDate,
@@ -36,32 +45,49 @@ type QcRow = {
   vehicleno: string | null;
   dti_no: string | null;
   cname: string | null;
+  mobileno?: string | null;
+  bank_ref_no?: string | null;
   bankname: string;
   company: string;
   model: string;
+  variant?: string;
   agent_name: string;
+  remarks?: string | null;
   valuation_price: number | null;
   ownership_name: string | null;
   created_at: string | null;
+  job_created_at?: string | null;
+  assigned_at?: string | null;
   qc_datetime?: string | null;
 };
 
 export function CompleteCasesPage() {
-  const [vehicleType, setVehicleType] = useState("all");
+  const queryClient = useQueryClient();
+  const [filters, setFilters] = useState<CaseListFilterState>(EMPTY_CASE_FILTERS);
 
   const listQuery = useQuery({
-    queryKey: ["jobs-complete", vehicleType],
+    queryKey: ["jobs-complete"],
     queryFn: async () => {
-      const res = await fetch(
-        `/api/v2/jobs/qc?done=1&vehicle_type=${vehicleType}`,
-      );
+      const res = await fetch(`/api/v2/jobs/qc?done=1&vehicle_type=all`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.message || "Failed");
       return (json.data ?? []) as QcRow[];
     },
   });
 
-  const rows = listQuery.data ?? [];
+  const allRows = listQuery.data ?? [];
+  const banks = useMemo(
+    () => uniqueSorted(allRows.map((r) => r.bankname)),
+    [allRows],
+  );
+  const surveyors = useMemo(
+    () => uniqueSorted(allRows.map((r) => r.agent_name)),
+    [allRows],
+  );
+  const rows = useMemo(
+    () => filterCaseRows(allRows, filters, "qc"),
+    [allRows, filters],
+  );
 
   return (
     <>
@@ -72,25 +98,26 @@ export function CompleteCasesPage() {
         badge="Done"
       />
       <JobsListingCard
-        title="Completed inspections"
+        title="Case list"
         description="QC approved cases — view details or download the PDF report"
         count={rows.length}
+        totalCount={allRows.length}
         loading={listQuery.isLoading}
         error={
           listQuery.isError ? (listQuery.error as Error).message : null
         }
-        empty="No completed cases"
-        toolbar={
-          <select
-            className="h-8 rounded-md border border-border bg-background px-2.5 text-[12px]"
-            value={vehicleType}
-            onChange={(e) => setVehicleType(e.target.value)}
-          >
-            <option value="all">All types</option>
-            <option value="2wheeler">2 Wheeler</option>
-            <option value="3wheeler">3 Wheeler</option>
-            <option value="4wheeler">4 Wheeler</option>
-          </select>
+        empty={
+          allRows.length > 0
+            ? "No cases match these filters"
+            : "No completed cases"
+        }
+        filters={
+          <CaseListToolbar
+            value={filters}
+            onChange={setFilters}
+            banks={banks}
+            surveyors={surveyors}
+          />
         }
       >
         {rows.length > 0 ? (
@@ -141,34 +168,68 @@ export function CompleteCasesPage() {
                   <JobsTableCell>
                     <JobActions>
                       {row.job_id ? (
-                        <>
-                          <JobActionLink
-                            href={inspectPathForJob(
-                              row.job_id,
-                              row.vehicle_type,
-                              { mode: "view" },
-                            )}
-                            tone="outline"
-                            icon={Eye}
-                            label="View"
-                          />
-                          <JobActionLink
-                            href={inspectPathForJob(
-                              row.job_id,
-                              row.vehicle_type,
-                              { mode: "edit" },
-                            )}
-                            tone="muted"
-                            icon={Pencil}
-                            label="Edit"
-                          />
-                        </>
+                        <JobActionLink
+                          href={inspectPathForJob(
+                            row.job_id,
+                            row.vehicle_type,
+                            { mode: "edit" },
+                          )}
+                          tone="edit"
+                          icon={Pencil}
+                          label="Edit"
+                        />
+                      ) : null}
+                      {row.job_id ? (
+                        <JobActionLink
+                          href={inspectPathForJob(
+                            row.job_id,
+                            row.vehicle_type,
+                            { mode: "view" },
+                          )}
+                          tone="info"
+                          icon={Eye}
+                          label="View"
+                        />
                       ) : null}
                       <JobActionLink
                         href={pdfPathForInspection(row.vehicle_type, row.id)}
                         tone="primary"
                         icon={FileText}
                         label="PDF"
+                      />
+                      <ChangeStageButton
+                        from="complete"
+                        jobId={row.job_id}
+                        dtiNo={row.dti_no}
+                        onSuccess={() => {
+                          void queryClient.invalidateQueries({
+                            queryKey: ["jobs-complete"],
+                          });
+                        }}
+                      />
+                      <JobHistoryButton
+                        stage="complete"
+                        job={{
+                          id: row.job_id ?? row.id,
+                          dti_no: row.dti_no,
+                          cname: row.cname,
+                          mobileno: row.mobileno,
+                          vehicleno: row.vehicleno,
+                          vehicle_type: row.vehicle_type,
+                          bankname: row.bankname,
+                          bank_ref_no: row.bank_ref_no,
+                          company: row.company,
+                          model: row.model,
+                          variant: row.variant,
+                          agent_name: row.agent_name,
+                          remarks: row.remarks,
+                          valuation_price: row.valuation_price,
+                          ownership_name: row.ownership_name,
+                          job_created_at: row.job_created_at,
+                          assigned_at: row.assigned_at,
+                          created_at_inspection: row.created_at,
+                          qc_datetime: row.qc_datetime,
+                        }}
                       />
                     </JobActions>
                   </JobsTableCell>

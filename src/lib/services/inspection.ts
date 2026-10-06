@@ -10,6 +10,7 @@ import {
   appendInspectionPhotos,
   listInspectionPhotos,
 } from "@/lib/services/inspection-media";
+import { logJobHistory } from "@/lib/services/job-history";
 import type { SessionUser } from "@/types/next-auth";
 
 export type VehicleType = WheelKind | string;
@@ -211,7 +212,15 @@ export async function saveInspection(
     await appendInspectionPhotos(kind, row.id, payload.photos);
   }
 
-  await enqueueCaseSubmittedSms({ jobId: payload.job_id });
+  // Never block inspection save / image upload on Redis SMS
+  void enqueueCaseSubmittedSms({ jobId: payload.job_id });
+
+  await logJobHistory({
+    jobId: payload.job_id,
+    userId: Number(user.id),
+    event: "Inspection submitted",
+    remark: "Inspection submitted to Quality Check",
+  });
 
   const photos = await listInspectionPhotos(kind, row.id);
   return { ...row, photos };

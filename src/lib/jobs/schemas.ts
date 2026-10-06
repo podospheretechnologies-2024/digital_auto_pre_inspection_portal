@@ -150,9 +150,15 @@ export const workflowActionSchema = z.object({
   action: z.enum(["hold", "resume", "cancel", "restore"]),
 });
 
+/** Move a case back to an earlier workflow desk */
+export const changeStageSchema = z.object({
+  stage: z.enum(["fresh", "assigned", "qc_pending"]),
+});
+
 export type JobListFilter = z.infer<typeof jobListFilterSchema>;
 export type CreateJobInput = z.infer<typeof createJobSchema>;
 export type UpdateJobInput = z.infer<typeof updateJobSchema>;
 export type InspectionCoreInput = z.infer<typeof inspectionCoreSchema>;
 export type QcSubmitInput = z.infer<typeof qcSubmitSchema>;
 export type WorkflowAction = z.infer<typeof workflowActionSchema>["action"];
+export type ChangeStageTarget = z.infer<typeof changeStageSchema>["stage"];

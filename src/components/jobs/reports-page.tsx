@@ -199,7 +199,7 @@ export function ReportsPage() {
                             row.vehicle_type,
                             { mode: "view" },
                           )}
-                          tone="outline"
+                          tone="info"
                           icon={Eye}
                           label="View"
                         />

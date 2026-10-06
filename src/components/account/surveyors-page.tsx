@@ -12,6 +12,8 @@ export function SurveyorsPage() {
       roleOptions={["RO", "Surveyor"]}
       defaultRole="RO"
       showApprove
+      showResetPassword
+      showDeactivate
       addLabel="Add RO / Surveyor"
     />
   );

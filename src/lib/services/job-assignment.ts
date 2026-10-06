@@ -5,14 +5,17 @@ import {
   parseJobDate,
   resolveFinYear,
   resolveWheelKind,
+  type WheelKind,
   type WorkflowStatus,
 } from "@/lib/jobs/helpers";
 import type {
+  ChangeStageTarget,
   CreateJobInput,
   JobListFilter,
   UpdateJobInput,
   WorkflowAction,
 } from "@/lib/jobs/schemas";
+import { logJobHistory } from "@/lib/services/job-history";
 import type { SessionUser } from "@/types/next-auth";
 
 export type JobListItem = {
@@ -393,6 +396,13 @@ export async function createJob(user: SessionUser, input: CreateJobInput) {
     });
   }
 
+  await logJobHistory({
+    jobId: created.id,
+    userId: Number(user.id),
+    event: "Create Intimation",
+    remark: "Created the case intimation",
+  });
+
   return created;
 }
 
@@ -421,7 +431,11 @@ export async function updateJob(input: UpdateJobInput) {
 }
 
 /** Assign (or reassign) surveyor/agent — Laravel assignupdate_agent (+ SMS). */
-export async function assignJob(jobId: number, agentId: number) {
+export async function assignJob(
+  jobId: number,
+  agentId: number,
+  actorUserId?: number | null,
+) {
   const agent = await db.users.findFirst({
     where: {
       id: agentId,
@@ -430,7 +444,12 @@ export async function assignJob(jobId: number, agentId: number) {
       verified_at: { not: null },
       parent_id: { not: null },
     },
-    select: { id: true, parent_id: true },
+    select: {
+      id: true,
+      parent_id: true,
+      first_name: true,
+      last_name: true,
+    },
   });
   if (!agent?.parent_id) {
     throw new Error("INVALID_SURVEYOR");
@@ -443,7 +462,7 @@ export async function assignJob(jobId: number, agentId: number) {
       is_deleted: 0,
       verified_at: { not: null },
     },
-    select: { id: true },
+    select: { id: true, first_name: true, last_name: true },
   });
   if (!parentRo) throw new Error("INVALID_PARENT_RO");
 
@@ -466,6 +485,25 @@ export async function assignJob(jobId: number, agentId: number) {
     customerMobile: updated.mobileno,
   });
 
+  const roName = `${parentRo.first_name} ${parentRo.last_name}`.trim();
+  const surveyorName = `${agent.first_name} ${agent.last_name}`.trim();
+  await logJobHistory({
+    jobId,
+    userId: actorUserId,
+    event: "Assign RO",
+    remark: roName
+      ? `Assigned RO ${roName} to this case`
+      : "Assigned an RO to this case",
+  });
+  await logJobHistory({
+    jobId,
+    userId: actorUserId,
+    event: "Assign Agent",
+    remark: surveyorName
+      ? `Assigned surveyor ${surveyorName} to this case`
+      : "Assigned a surveyor to this case",
+  });
+
   return updated;
 }
 
@@ -476,27 +514,43 @@ export async function deleteJob(jobId: number) {
 export async function applyWorkflowAction(
   jobId: number,
   action: WorkflowAction,
+  actorUserId?: number | null,
 ) {
   const job = await db.tbl_jobs.findFirst({ where: { id: jobId } });
   if (!job) throw new Error("NOT_FOUND");
 
   const now = new Date();
+  let updated;
 
   switch (action) {
     case "hold":
       if (job.is_deleted === 1) throw new Error("CANCELLED");
-      return db.tbl_jobs.update({
+      updated = await db.tbl_jobs.update({
         where: { id: jobId },
         data: { on_hold: 1, hold_at: now, updated_at: now },
       });
+      await logJobHistory({
+        jobId,
+        userId: actorUserId,
+        event: "Hold",
+        remark: "Case was put on Hold",
+      });
+      return updated;
     case "resume":
       if (job.is_deleted === 1) throw new Error("CANCELLED");
-      return db.tbl_jobs.update({
+      updated = await db.tbl_jobs.update({
         where: { id: jobId },
         data: { on_hold: 0, hold_at: null, updated_at: now },
       });
+      await logJobHistory({
+        jobId,
+        userId: actorUserId,
+        event: "Resume",
+        remark: "Case was resumed from Hold",
+      });
+      return updated;
     case "cancel":
-      return db.tbl_jobs.update({
+      updated = await db.tbl_jobs.update({
         where: { id: jobId },
         data: {
           is_deleted: 1,
@@ -506,8 +560,15 @@ export async function applyWorkflowAction(
           updated_at: now,
         },
       });
+      await logJobHistory({
+        jobId,
+        userId: actorUserId,
+        event: "Cancel",
+        remark: "Case was cancelled",
+      });
+      return updated;
     case "restore":
-      return db.tbl_jobs.update({
+      updated = await db.tbl_jobs.update({
         where: { id: jobId },
         data: {
           is_deleted: 0,
@@ -516,5 +577,160 @@ export async function applyWorkflowAction(
           updated_at: now,
         },
       });
+      await logJobHistory({
+        jobId,
+        userId: actorUserId,
+        event: "Restore",
+        remark: "Cancelled case was restored",
+      });
+      return updated;
   }
+}
+
+async function findLinkedInspection(jobId: number): Promise<{
+  kind: WheelKind;
+  id: number;
+  qc: number | null;
+} | null> {
+  const two = await db.tbl_2wheeler.findFirst({
+    where: { job_id: jobId },
+    orderBy: { id: "desc" },
+    select: { id: true, qc: true },
+  });
+  if (two) return { kind: "2wheeler", id: two.id, qc: two.qc };
+
+  const three = await db.tbl_3wheeler.findFirst({
+    where: { job_id: jobId },
+    orderBy: { id: "desc" },
+    select: { id: true, qc: true },
+  });
+  if (three) return { kind: "3wheeler", id: three.id, qc: three.qc };
+
+  const four = await db.tbl_4wheeler.findFirst({
+    where: { job_id: jobId },
+    orderBy: { id: "desc" },
+    select: { id: true, qc: true },
+  });
+  if (four) return { kind: "4wheeler", id: four.id, qc: four.qc };
+
+  return null;
+}
+
+/** Remove inspection (+ images) when moving back to Assign/Fresh — no orphan QC rows. */
+async function removeInspectionForStageChange(insp: {
+  kind: WheelKind;
+  id: number;
+}) {
+  if (insp.kind === "2wheeler") {
+    await db.tbl_2wheeler_images.deleteMany({ where: { parent_id: insp.id } });
+    await db.tbl_2wheeler.delete({ where: { id: insp.id } });
+    return;
+  }
+  if (insp.kind === "3wheeler") {
+    await db.tbl_3wheeler_images.deleteMany({ where: { parent_id: insp.id } });
+    await db.tbl_3wheeler.delete({ where: { id: insp.id } });
+    return;
+  }
+  await db.tbl_4wheeler_images.deleteMany({ where: { parent_id: insp.id } });
+  await db.tbl_4wheeler.delete({ where: { id: insp.id } });
+}
+
+async function resetInspectionQc(
+  insp: { kind: WheelKind; id: number },
+  now: Date,
+) {
+  const data = {
+    qc: 0,
+    qc_checked_by: null as string | null,
+    qc_datetime: null as Date | null,
+    updated_at: now,
+  };
+  if (insp.kind === "2wheeler") {
+    await db.tbl_2wheeler.update({ where: { id: insp.id }, data });
+    return;
+  }
+  if (insp.kind === "3wheeler") {
+    await db.tbl_3wheeler.update({ where: { id: insp.id }, data });
+    return;
+  }
+  await db.tbl_4wheeler.update({ where: { id: insp.id }, data });
+}
+
+/**
+ * Move a case back to an earlier desk:
+ * completed → qc_pending | assigned | fresh
+ * qc_pending → assigned | fresh
+ * assigned → fresh
+ */
+export async function changeJobStage(
+  jobId: number,
+  target: ChangeStageTarget,
+  actorUserId?: number | null,
+) {
+  const job = await db.tbl_jobs.findFirst({ where: { id: jobId } });
+  if (!job) throw new Error("NOT_FOUND");
+  if (job.is_deleted === 1) throw new Error("CANCELLED");
+
+  const insp = await findLinkedInspection(jobId);
+  const current = deriveWorkflowStatus({
+    agent_id: job.agent_id,
+    hasInspection: insp != null,
+    qc: insp?.qc,
+    on_hold: job.on_hold,
+    is_deleted: job.is_deleted,
+  });
+
+  const allowed: Partial<Record<WorkflowStatus, ChangeStageTarget[]>> = {
+    completed: ["qc_pending", "assigned", "fresh"],
+    qc_pending: ["assigned", "fresh"],
+    assigned: ["fresh"],
+  };
+  if (!allowed[current]?.includes(target)) {
+    throw new Error("INVALID_TRANSITION");
+  }
+
+  const now = new Date();
+  const stageLabel =
+    target === "qc_pending"
+      ? "Quality Check"
+      : target === "assigned"
+        ? "Assign Case"
+        : "Fresh Case";
+
+  if (target === "qc_pending") {
+    if (!insp) throw new Error("NO_INSPECTION");
+    await resetInspectionQc(insp, now);
+    await db.tbl_jobs.update({
+      where: { id: jobId },
+      data: { on_hold: 0, hold_at: null, updated_at: now },
+    });
+  } else if (target === "assigned") {
+    if (job.agent_id == null) throw new Error("NO_AGENT");
+    if (insp) await removeInspectionForStageChange(insp);
+    await db.tbl_jobs.update({
+      where: { id: jobId },
+      data: { on_hold: 0, hold_at: null, updated_at: now },
+    });
+  } else {
+    if (insp) await removeInspectionForStageChange(insp);
+    await db.tbl_jobs.update({
+      where: { id: jobId },
+      data: {
+        agent_id: null,
+        assigned_at: null,
+        on_hold: 0,
+        hold_at: null,
+        updated_at: now,
+      },
+    });
+  }
+
+  await logJobHistory({
+    jobId,
+    userId: actorUserId,
+    event: "Change Stage",
+    remark: `Moved case back to ${stageLabel}`,
+  });
+
+  return getJobById(jobId);
 }

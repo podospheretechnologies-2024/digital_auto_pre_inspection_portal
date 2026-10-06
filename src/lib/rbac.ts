@@ -62,12 +62,18 @@ export function isAdminOrBank(user: SessionUser | null | undefined): boolean {
   return isAdmin(user) || isBank(user);
 }
 
+/** Admin, HO, or Bank — Manage Data Export / reports */
+export function isAdminHoOrBank(user: SessionUser | null | undefined): boolean {
+  return isBoth(user) || isBank(user);
+}
+
 export function hasPermission(
   user: SessionUser | null | undefined,
   permission: string,
 ): boolean {
   if (!user) return false;
-  if (isAdmin(user)) return true;
+  // Admin + HO have full Manage access; RO/Surveyor use granted menu codes.
+  if (isBoth(user)) return true;
   return user.permissions.includes(permission);
 }
 

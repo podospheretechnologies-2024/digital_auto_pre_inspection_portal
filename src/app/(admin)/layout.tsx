@@ -19,6 +19,7 @@ export default async function AdminLayout({
     <AdminShell
       userName={displayName(session.user)}
       roleLabel={roleLabel(session.user)}
+      userRole={roleLabel(session.user)}
     >
       {children}
     </AdminShell>

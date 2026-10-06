@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -14,6 +15,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  CrudActionButton,
+  CrudActionGroup,
+} from "@/components/ui/crud-action-button";
 import {
   Dialog,
   DialogContent,
@@ -49,6 +54,13 @@ async function apiJson<T>(url: string, init?: RequestInit): Promise<T> {
   return json as T;
 }
 
+function singularItemLabel(pluralTitle: string) {
+  const t = pluralTitle.trim();
+  if (/ies$/i.test(t)) return `${t.slice(0, -3)}y`; // Cities → City, Companies → Company
+  if (/s$/i.test(t)) return t.slice(0, -1); // Banks → Bank, Brokers → Broker
+  return t;
+}
+
 export function NameOnlyMasterPage({
   title,
   description,
@@ -61,6 +73,7 @@ export function NameOnlyMasterPage({
   queryKey: string;
 }) {
   const queryClient = useQueryClient();
+  const itemLabel = singularItemLabel(title);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<NameRow | null>(null);
   const [name, setName] = useState("");
@@ -127,7 +140,7 @@ export function NameOnlyMasterPage({
       <PageHeader
         title={title}
         description={description}
-        actions={<Button onClick={openCreate}>Add {title.slice(0, -1) || title}</Button>}
+        actions={<Button onClick={openCreate}>Add {itemLabel}</Button>}
       />
 
       <Card>
@@ -158,21 +171,21 @@ export function NameOnlyMasterPage({
                   <TableRow key={row.id}>
                     <TableCell>{row.id}</TableCell>
                     <TableCell className="font-medium">{row.name}</TableCell>
-                    <TableCell className="space-x-2 text-right">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => openEdit(row)}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => setDeleteTarget(row)}
-                      >
-                        Delete
-                      </Button>
+                    <TableCell className="text-right">
+                      <CrudActionGroup>
+                        <CrudActionButton
+                          tone="edit"
+                          icon={Pencil}
+                          label="Edit"
+                          onClick={() => openEdit(row)}
+                        />
+                        <CrudActionButton
+                          tone="delete"
+                          icon={Trash2}
+                          label="Delete"
+                          onClick={() => setDeleteTarget(row)}
+                        />
+                      </CrudActionGroup>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -186,7 +199,7 @@ export function NameOnlyMasterPage({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {editing ? `Edit ${title}` : `Add ${title}`}
+              {editing ? `Edit ${itemLabel}` : `Add ${itemLabel}`}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-2">
@@ -218,7 +231,7 @@ export function NameOnlyMasterPage({
           if (!open) setDeleteTarget(null);
         }}
         tone="danger"
-        title={`Delete ${title.toLowerCase().replace(/s$/, "")}?`}
+        title={`Delete ${itemLabel.toLowerCase()}?`}
         description={
           deleteTarget
             ? `“${deleteTarget.name}” will be removed. This cannot be undone.`

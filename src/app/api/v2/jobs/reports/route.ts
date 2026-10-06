@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requireAdminOrBankUser } from "@/lib/api";
+import { requireAdminHoOrBankUser } from "@/lib/api";
 import { isBank } from "@/lib/rbac";
 import { searchPreInspectionReports } from "@/lib/services/qc";
 
@@ -9,7 +9,7 @@ import { searchPreInspectionReports } from "@/lib/services/qc";
  * Pre-Inspection global search (QC-complete). PDF download stubbed (Phase 6).
  */
 export async function GET(request: Request) {
-  const user = await requireAdminOrBankUser();
+  const user = await requireAdminHoOrBankUser();
   if (user instanceof NextResponse) return user;
 
   const url = new URL(request.url);

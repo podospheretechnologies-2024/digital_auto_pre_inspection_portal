@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 
 import { requireBothUser, zodErrorResponse } from "@/lib/api";
-import { workflowActionSchema } from "@/lib/jobs/schemas";
-import { applyWorkflowAction } from "@/lib/services/job-assignment";
+import { changeStageSchema } from "@/lib/jobs/schemas";
+import { changeJobStage } from "@/lib/services/job-assignment";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
-/** POST /api/v2/jobs/[id]/workflow — { action: hold|resume|cancel|restore } */
+/** POST /api/v2/jobs/[id]/change-stage — { stage: fresh|assigned|qc_pending } */
 export async function POST(request: Request, context: RouteContext) {
   const user = await requireBothUser();
   if (user instanceof NextResponse) return user;
@@ -20,13 +20,13 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   const body = await request.json();
-  const parsed = workflowActionSchema.safeParse(body);
+  const parsed = changeStageSchema.safeParse(body);
   if (!parsed.success) return zodErrorResponse(parsed.error);
 
   try {
-    const data = await applyWorkflowAction(
+    const data = await changeJobStage(
       jobId,
-      parsed.data.action,
+      parsed.data.stage,
       Number(user.id),
     );
     return NextResponse.json({ data, ok: true });
@@ -40,7 +40,28 @@ export async function POST(request: Request, context: RouteContext) {
         { status: 422 },
       );
     }
-    console.error("[api/v2/jobs/workflow]", error);
-    return NextResponse.json({ message: "Workflow action failed" }, { status: 500 });
+    if (error instanceof Error && error.message === "INVALID_TRANSITION") {
+      return NextResponse.json(
+        { message: "That stage change is not allowed from here" },
+        { status: 422 },
+      );
+    }
+    if (error instanceof Error && error.message === "NO_INSPECTION") {
+      return NextResponse.json(
+        { message: "No inspection found for this case" },
+        { status: 422 },
+      );
+    }
+    if (error instanceof Error && error.message === "NO_AGENT") {
+      return NextResponse.json(
+        { message: "Case has no assigned surveyor" },
+        { status: 422 },
+      );
+    }
+    console.error("[api/v2/jobs/change-stage]", error);
+    return NextResponse.json(
+      { message: "Change stage failed" },
+      { status: 500 },
+    );
   }
 }

@@ -23,7 +23,11 @@ export async function POST(request: Request, context: RouteContext) {
   if (!parsed.success) return zodErrorResponse(parsed.error);
 
   try {
-    const data = await assignJob(parsed.data.job_id, parsed.data.agent_id);
+    const data = await assignJob(
+      parsed.data.job_id,
+      parsed.data.agent_id,
+      Number(user.id),
+    );
     return NextResponse.json({ data });
   } catch (error) {
     if (error instanceof Error && error.message === "INVALID_SURVEYOR") {
