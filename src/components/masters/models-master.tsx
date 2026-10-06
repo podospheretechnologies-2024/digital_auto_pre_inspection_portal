@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -14,6 +15,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  CrudActionButton,
+  CrudActionGroup,
+} from "@/components/ui/crud-action-button";
 import {
   Dialog,
   DialogContent,
@@ -160,28 +165,28 @@ export function ModelsMasterPage() {
                   <TableRow key={row.id}>
                     <TableCell className="font-medium">{row.name}</TableCell>
                     <TableCell>{row.company_name}</TableCell>
-                    <TableCell className="space-x-2 text-right">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setEditingId(row.id);
-                          setName(row.name);
-                          setCompanyId(String(row.company_id));
-                          setOpen(true);
-                        }}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() =>
-                          setDeleteTarget({ id: row.id, name: row.name })
-                        }
-                      >
-                        Delete
-                      </Button>
+                    <TableCell className="text-right">
+                      <CrudActionGroup>
+                        <CrudActionButton
+                          tone="edit"
+                          icon={Pencil}
+                          label="Edit"
+                          onClick={() => {
+                            setEditingId(row.id);
+                            setName(row.name);
+                            setCompanyId(String(row.company_id));
+                            setOpen(true);
+                          }}
+                        />
+                        <CrudActionButton
+                          tone="delete"
+                          icon={Trash2}
+                          label="Delete"
+                          onClick={() =>
+                            setDeleteTarget({ id: row.id, name: row.name })
+                          }
+                        />
+                      </CrudActionGroup>
                     </TableCell>
                   </TableRow>
                 ))}

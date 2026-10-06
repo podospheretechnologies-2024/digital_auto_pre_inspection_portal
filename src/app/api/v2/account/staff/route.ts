@@ -51,11 +51,20 @@ export async function POST(request: Request) {
 
   try {
     const data = await createPerson(parsed.data);
-    return NextResponse.json({ data, ok: true }, { status: 201 });
+    return NextResponse.json(
+      { data, ok: true, message: "HO staff created" },
+      { status: 201 },
+    );
   } catch (error) {
     if (error instanceof Error && error.message === "EMAIL_TAKEN") {
       return NextResponse.json(
         { message: "Email already in use", errors: { email: ["Taken"] } },
+        { status: 422 },
+      );
+    }
+    if (error instanceof Error && error.message === "INVALID_CITY") {
+      return NextResponse.json(
+        { message: "Select a valid city", errors: { city: ["Invalid"] } },
         { status: 422 },
       );
     }
@@ -104,6 +113,12 @@ export async function PUT(request: Request) {
     }
     if (error instanceof Error && error.message === "NOT_FOUND") {
       return NextResponse.json({ message: "Not found" }, { status: 404 });
+    }
+    if (error instanceof Error && error.message === "INVALID_CITY") {
+      return NextResponse.json(
+        { message: "Select a valid city", errors: { city: ["Invalid"] } },
+        { status: 422 },
+      );
     }
     console.error(error);
     return NextResponse.json({ message: "Update failed" }, { status: 500 });

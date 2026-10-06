@@ -485,6 +485,26 @@ export async function approveSurveyor(agentId: number) {
   });
 }
 
+export async function setPersonStatus(
+  id: number,
+  status: "Active" | "Inactive",
+  allowedRoles: PersonRole[],
+) {
+  const current = await db.users.findFirst({
+    where: { id, is_deleted: 0 },
+    select: { id: true, type: true, is_admin: true },
+  });
+  if (!current) throw new Error("NOT_FOUND");
+
+  const role = roleFromUser(current.type, current.is_admin);
+  if (!allowedRoles.includes(role)) throw new Error("NOT_FOUND");
+
+  await db.users.update({
+    where: { id },
+    data: { status, updated_at: new Date() },
+  });
+}
+
 export async function changeStaffPassword(input: StaffPasswordInput) {
   const passwordHash = await hash(input.password, 10);
   const updated = await db.users.updateMany({
@@ -514,12 +534,12 @@ export async function changePersonPassword(
   });
 }
 
-/** HO + RO for soft permission assignment by Admin. Surveyors use hard ceiling. */
+/** HO + RO + Surveyor for permission assignment by Admin. Surveyors use hard ceiling. */
 export async function listHoStaffForPermissions() {
   return db.users.findMany({
     where: {
       is_deleted: 0,
-      OR: [{ type: "HO" }, { type: "RO" }],
+      OR: [{ type: "HO" }, { type: "RO" }, { type: "Surveyor" }],
     },
     orderBy: [{ type: "asc" }, { first_name: "asc" }, { last_name: "asc" }],
     select: {

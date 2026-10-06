@@ -29,6 +29,12 @@ export type NavItem = {
   chevron?: boolean;
   /** Exact match only (avoid /jobs matching everything) */
   exact?: boolean;
+  /**
+   * Who can see this item in the sidebar.
+   * omit / "all" = every logged-in user
+   * "admin" | "both" (Admin+HO) | "adminHoBank" | "adminOnly"
+   */
+  access?: "all" | "admin" | "both" | "adminHoBank" | "adminOnly";
 };
 
 export type NavGroup = {
@@ -105,48 +111,56 @@ export const adminNavGroups: NavGroup[] = [
         href: "/account/surveyors",
         icon: MapPin,
         chevron: true,
+        access: "both",
       },
       {
         title: "HO Staff",
         href: "/account/staff",
         icon: Users,
         chevron: true,
+        access: "adminOnly",
       },
       {
         title: "Admins",
         href: "/account/admins",
         icon: ShieldCheck,
         chevron: true,
+        access: "adminOnly",
       },
       {
         title: "Bank User List",
         href: "/account/bank-users",
         icon: Building2,
         chevron: true,
+        access: "both",
       },
       {
         title: "Staff permissions",
         href: "/account/staff-permissions",
         icon: ClipboardCheck,
         chevron: true,
+        access: "adminOnly",
       },
       {
         title: "Masters",
         href: "/masters",
         icon: LayoutGrid,
         chevron: true,
+        access: "both",
       },
       {
         title: "Account",
         href: "/account/settings",
         icon: Settings,
         chevron: true,
+        access: "all",
       },
       {
         title: "Data Export",
         href: "/jobs/reports",
         icon: CloudDownload,
         chevron: true,
+        access: "adminHoBank",
       },
     ],
   },

@@ -6,6 +6,7 @@ import {
 } from "@/lib/api";
 import {
   bankUserCreateSchema,
+  bankUserDeleteSchema,
   bankUserUpdateSchema,
 } from "@/lib/account/schemas";
 import {
@@ -13,6 +14,7 @@ import {
   getBankUser,
   getBankUserLookups,
   listBankUsers,
+  softDeleteBankUser,
   updateBankUser,
 } from "@/lib/account/service";
 
@@ -95,5 +97,25 @@ export async function PUT(request: Request) {
     }
     console.error(error);
     return NextResponse.json({ message: "Update failed" }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  const user = await requireBothWithPermission("bank_user_edit");
+  if (user instanceof NextResponse) return user;
+
+  const body = await request.json();
+  const parsed = bankUserDeleteSchema.safeParse(body);
+  if (!parsed.success) return zodErrorResponse(parsed.error);
+
+  try {
+    await softDeleteBankUser(parsed.data.id);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    if (error instanceof Error && error.message === "NOT_FOUND") {
+      return NextResponse.json({ message: "Not found" }, { status: 404 });
+    }
+    console.error(error);
+    return NextResponse.json({ message: "Delete failed" }, { status: 500 });
   }
 }

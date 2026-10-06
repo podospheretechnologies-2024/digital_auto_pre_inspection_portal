@@ -12,6 +12,10 @@ import type { SmsNotifyJobData } from "@/lib/services/sms-notify";
 let enqueueConnection: IORedis | null = null;
 let smsQueue: Queue | null = null;
 
+function isSmsEnabled(): boolean {
+  return (process.env.SMS_ENABLED ?? "false").toLowerCase() === "true";
+}
+
 function getEnqueueConnection(): IORedis {
   if (!enqueueConnection) {
     const url = process.env.REDIS_URL ?? "redis://127.0.0.1:6379";
@@ -19,6 +23,8 @@ function getEnqueueConnection(): IORedis {
       maxRetriesPerRequest: null,
       lazyConnect: true,
       enableOfflineQueue: false,
+      connectTimeout: 1500,
+      retryStrategy: () => null,
     });
   }
   return enqueueConnection;
@@ -33,20 +39,42 @@ function getSmsQueue(): Queue {
   return smsQueue;
 }
 
+async function withTimeout<T>(promise: Promise<T>, ms: number, label: string) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timeout`)), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export async function enqueuePiSms(
   data: SmsNotifyJobData,
 ): Promise<{ enqueued: boolean; reason?: string }> {
+  if (!isSmsEnabled()) {
+    return { enqueued: false, reason: "SMS disabled" };
+  }
+
   try {
     const redis = getEnqueueConnection();
     if (redis.status === "wait") {
-      await redis.connect();
+      await withTimeout(redis.connect(), 1500, "Redis connect");
     }
-    await getSmsQueue().add(data.kind, data, {
-      attempts: 3,
-      backoff: { type: "exponential", delay: 5000 },
-      removeOnComplete: 100,
-      removeOnFail: 200,
-    });
+    await withTimeout(
+      getSmsQueue().add(data.kind, data, {
+        attempts: 3,
+        backoff: { type: "exponential", delay: 5000 },
+        removeOnComplete: 100,
+        removeOnFail: 200,
+      }),
+      2000,
+      "SMS enqueue",
+    );
     return { enqueued: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

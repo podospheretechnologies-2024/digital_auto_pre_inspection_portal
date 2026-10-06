@@ -13,6 +13,7 @@ type StaffOpt = {
   first_name: string;
   last_name: string;
   email: string;
+  type?: string | null;
 };
 
 type MenuItem = {
@@ -99,7 +100,7 @@ export function StaffPermissionsPage() {
     <>
       <PageHeader
         title="Staff permissions"
-        description="HO menu permissions (view / entry / edit / delete)"
+        description="Assign menu permissions for HO, RO, and Surveyor (view / entry / edit / delete)"
       />
       <div className="mb-4 max-w-md space-y-1.5">
         <Label>Staff member</Label>
@@ -113,7 +114,7 @@ export function StaffPermissionsPage() {
           <option value="">Select staff…</option>
           {staff.map((s) => (
             <option key={s.id} value={s.id}>
-              {s.first_name} {s.last_name} — {s.email}
+              [{s.type || "Staff"}] {s.first_name} {s.last_name} — {s.email}
             </option>
           ))}
         </select>

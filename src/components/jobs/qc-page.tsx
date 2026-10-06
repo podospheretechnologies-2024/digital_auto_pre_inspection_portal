@@ -1,11 +1,14 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Eye, FileText, Pencil, ShieldCheck } from "lucide-react";
-import { useState } from "react";
+import { CirclePause, ClipboardCheck } from "lucide-react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { RegPlate } from "@/components/atlas/reg-plate";
+import { CaseListToolbar } from "@/components/jobs/case-list-toolbar";
+import { ChangeStageButton } from "@/components/jobs/change-stage-button";
+import { JobHistoryButton } from "@/components/jobs/job-history-button";
 import {
   JobActionButton,
   JobActionLink,
@@ -32,12 +35,18 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  EMPTY_CASE_FILTERS,
+  filterCaseRows,
+  uniqueSorted,
+  type CaseListFilterState,
+} from "@/lib/jobs/case-list-filters";
+import {
   inspectPathForJob,
-  pdfPathForInspection,
   formatDeskDate,
   type WheelKind,
 } from "@/lib/jobs/helpers";
@@ -49,14 +58,19 @@ type QcRow = {
   vehicleno: string | null;
   dti_no: string | null;
   cname: string | null;
+  mobileno?: string | null;
+  bank_ref_no?: string | null;
   bankname: string;
   company: string;
   model: string;
+  variant?: string;
   agent_name: string;
   remarks: string | null;
   valuation_price: number | null;
   ownership_name: string | null;
   created_at: string | null;
+  job_created_at?: string | null;
+  assigned_at?: string | null;
   qc_datetime?: string | null;
 };
 
@@ -75,8 +89,9 @@ async function apiJson<T>(url: string, init?: RequestInit): Promise<T> {
 
 export function QcJobsPage() {
   const queryClient = useQueryClient();
-  const [vehicleType, setVehicleType] = useState<string>("all");
+  const [filters, setFilters] = useState<CaseListFilterState>(EMPTY_CASE_FILTERS);
   const [active, setActive] = useState<QcRow | null>(null);
+  const [holdJobId, setHoldJobId] = useState<number | null>(null);
   const [form, setForm] = useState({
     remarks: "",
     valuation_price: "",
@@ -84,10 +99,10 @@ export function QcJobsPage() {
   });
 
   const listQuery = useQuery({
-    queryKey: ["jobs-qc", vehicleType],
+    queryKey: ["jobs-qc"],
     queryFn: async () => {
       const json = await apiJson<{ data: QcRow[] }>(
-        `/api/v2/jobs/qc?vehicle_type=${vehicleType}`,
+        `/api/v2/jobs/qc?vehicle_type=all`,
       );
       return json.data;
     },
@@ -115,7 +130,37 @@ export function QcJobsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const rows = listQuery.data ?? [];
+  const holdMutation = useMutation({
+    mutationFn: async (jobId: number) =>
+      apiJson(`/api/v2/jobs/${jobId}/workflow`, {
+        method: "POST",
+        body: JSON.stringify({ action: "hold" }),
+      }),
+    onSuccess: async (_data, jobId) => {
+      toast.success("Moved to Hold");
+      setHoldJobId(null);
+      setActive((current) =>
+        current?.job_id === jobId ? null : current,
+      );
+      await queryClient.invalidateQueries({ queryKey: ["jobs-qc"] });
+      await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const allRows = listQuery.data ?? [];
+  const banks = useMemo(
+    () => uniqueSorted(allRows.map((r) => r.bankname)),
+    [allRows],
+  );
+  const surveyors = useMemo(
+    () => uniqueSorted(allRows.map((r) => r.agent_name)),
+    [allRows],
+  );
+  const rows = useMemo(
+    () => filterCaseRows(allRows, filters, "created"),
+    [allRows, filters],
+  );
 
   return (
     <>
@@ -128,25 +173,26 @@ export function QcJobsPage() {
 
       <JobsListingCard
         className="mb-6"
-        title="QC queue"
+        title="Case list"
         description="Inspections waiting for quality check"
         count={rows.length}
+        totalCount={allRows.length}
         loading={listQuery.isLoading}
         error={
           listQuery.isError ? (listQuery.error as Error).message : null
         }
-        empty="No pending QC cases"
-        toolbar={
-          <select
-            className="h-8 rounded-md border border-border bg-background px-2.5 text-[12px]"
-            value={vehicleType}
-            onChange={(e) => setVehicleType(e.target.value)}
-          >
-            <option value="all">All types</option>
-            <option value="2wheeler">2 Wheeler</option>
-            <option value="3wheeler">3 Wheeler</option>
-            <option value="4wheeler">4 Wheeler</option>
-          </select>
+        empty={
+          allRows.length > 0
+            ? "No cases match these filters"
+            : "No pending QC cases"
+        }
+        filters={
+          <CaseListToolbar
+            value={filters}
+            onChange={setFilters}
+            banks={banks}
+            surveyors={surveyors}
+          />
         }
       >
         {rows.length > 0 ? (
@@ -198,46 +244,53 @@ export function QcJobsPage() {
                             href={inspectPathForJob(
                               row.job_id,
                               row.vehicle_type,
-                              { mode: "view" },
-                            )}
-                            tone="outline"
-                            icon={Eye}
-                            label="Open"
-                          />
-                          <JobActionLink
-                            href={inspectPathForJob(
-                              row.job_id,
-                              row.vehicle_type,
                               { mode: "edit" },
                             )}
-                            tone="muted"
-                            icon={Pencil}
-                            label="Edit"
+                            tone="primary"
+                            icon={ClipboardCheck}
+                            label="Inspect"
                           />
-                          <JobActionLink
-                            href={pdfPathForInspection(
-                              row.vehicle_type,
-                              row.id,
-                            )}
-                            tone="muted"
-                            icon={FileText}
-                            label="PDF"
+                          <JobActionButton
+                            tone="warning"
+                            icon={CirclePause}
+                            label="Hold"
+                            disabled={holdMutation.isPending}
+                            onClick={() => setHoldJobId(row.job_id)}
                           />
                         </>
                       ) : null}
-                      <JobActionButton
-                        tone="primary"
-                        icon={ShieldCheck}
-                        label="QC"
-                        onClick={() => {
-                          setActive(row);
-                          setForm({
-                            remarks: row.remarks ?? "",
-                            valuation_price: String(
-                              row.valuation_price ?? "",
-                            ),
-                            ownership_name: row.ownership_name ?? "",
+                      <ChangeStageButton
+                        from="qc"
+                        jobId={row.job_id}
+                        dtiNo={row.dti_no}
+                        onSuccess={() => {
+                          void queryClient.invalidateQueries({
+                            queryKey: ["jobs-qc"],
                           });
+                        }}
+                      />
+                      <JobHistoryButton
+                        stage="qc"
+                        job={{
+                          id: row.job_id ?? row.id,
+                          dti_no: row.dti_no,
+                          cname: row.cname,
+                          mobileno: row.mobileno,
+                          vehicleno: row.vehicleno,
+                          vehicle_type: row.vehicle_type,
+                          bankname: row.bankname,
+                          bank_ref_no: row.bank_ref_no,
+                          company: row.company,
+                          model: row.model,
+                          variant: row.variant,
+                          agent_name: row.agent_name,
+                          remarks: row.remarks,
+                          valuation_price: row.valuation_price,
+                          ownership_name: row.ownership_name,
+                          job_created_at: row.job_created_at,
+                          assigned_at: row.assigned_at,
+                          created_at_inspection: row.created_at,
+                          qc_datetime: row.qc_datetime,
                         }}
                       />
                     </JobActions>
@@ -307,6 +360,23 @@ export function QcJobsPage() {
           </CardContent>
         </Card>
       ) : null}
+
+      <ConfirmDialog
+        open={holdJobId != null}
+        onOpenChange={(open) => {
+          if (!open) setHoldJobId(null);
+        }}
+        tone="hold"
+        title="Put this case on Hold?"
+        description="The case will move to the Hold queue. You can resume it anytime from there."
+        confirmLabel="Hold case"
+        cancelLabel="Keep working"
+        loading={holdMutation.isPending}
+        onConfirm={() => {
+          if (holdJobId == null) return;
+          holdMutation.mutate(holdJobId);
+        }}
+      />
     </>
   );
 }

@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
-import { hasPermission, isAdmin, isAdminOrBank, isAll, isBoth } from "@/lib/rbac";
+import {
+  hasPermission,
+  isAdmin,
+  isAdminHoOrBank,
+  isAdminOrBank,
+  isAll,
+  isBoth,
+} from "@/lib/rbac";
 import type { SessionUser } from "@/types/next-auth";
 
 export async function requireSessionUser(): Promise<
@@ -77,6 +84,20 @@ export async function requireAdminOrBankUser(): Promise<
   if (user instanceof NextResponse) return user;
 
   if (!isAdminOrBank(user)) {
+    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  }
+
+  return user;
+}
+
+/** Admin / HO / Bank — Data Export manage tab. */
+export async function requireAdminHoOrBankUser(): Promise<
+  SessionUser | NextResponse
+> {
+  const user = await requireSessionUser();
+  if (user instanceof NextResponse) return user;
+
+  if (!isAdminHoOrBank(user)) {
     return NextResponse.json({ message: "Forbidden" }, { status: 403 });
   }
 

@@ -58,6 +58,10 @@ export const bankUserUpdateSchema = z.object({
   email: z.string().trim().email().max(255),
 });
 
+export const bankUserDeleteSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});
+
 /** Admin-created people: RO / Surveyor / HO / Admin */
 export const personRoleSchema = z.enum(["Admin", "HO", "RO", "Surveyor"]);
 

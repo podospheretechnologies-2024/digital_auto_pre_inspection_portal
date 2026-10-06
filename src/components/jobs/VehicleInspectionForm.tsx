@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -135,6 +136,7 @@ export function VehicleInspectionForm({
   mode: modeProp = "create",
   skipQc = false,
 }: Props) {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [core, setCore] = useState(CORE_DEFAULTS);
   const [conditions, setConditions] = useState<Record<string, string>>({});
@@ -281,41 +283,43 @@ export function VehicleInspectionForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- seed once when data arrives
   }, [loadQuery.data, conditionKeys]);
 
-  const saveMutation = useMutation({
-    mutationFn: async () => {
-      const jobRow = loadQuery.data?.job;
-      const payload = {
-        job_id: jobId,
-        ...core,
-        valuation_price: core.valuation_price
-          ? Number(core.valuation_price)
-          : null,
-        ctime: core.ctime === "AM" || core.ctime === "PM" ? core.ctime : null,
-        company_id: jobRow?.company_id ?? null,
-        model_id: jobRow?.model_id ?? null,
-        variant_id: jobRow?.variant_id ?? null,
-        conditions,
-        vehicle_type: kind,
-        chassisphoto: chassisphoto || null,
-        video: video || null,
-        s3video_url: videoUrl,
-        photos: newPhotos.map((p) => ({
-          image: p.image,
-          s3_url: p.s3_url ?? p.url ?? null,
-        })),
-        skip_qc: skipQc,
-      };
-      if (inspectionId) {
-        return apiJson<{ data: { id: number } }>("/api/v2/jobs/inspections", {
-          method: "PUT",
-          body: JSON.stringify({ ...payload, inspection_id: inspectionId }),
-        });
-      }
+  async function persistInspection(forceSkipQc: boolean) {
+    const jobRow = loadQuery.data?.job;
+    const payload = {
+      job_id: jobId,
+      ...core,
+      valuation_price: core.valuation_price
+        ? Number(core.valuation_price)
+        : null,
+      ctime: core.ctime === "AM" || core.ctime === "PM" ? core.ctime : null,
+      company_id: jobRow?.company_id ?? null,
+      model_id: jobRow?.model_id ?? null,
+      variant_id: jobRow?.variant_id ?? null,
+      conditions,
+      vehicle_type: kind,
+      chassisphoto: chassisphoto || null,
+      video: video || null,
+      s3video_url: videoUrl,
+      photos: newPhotos.map((p) => ({
+        image: p.image,
+        s3_url: p.s3_url ?? p.url ?? null,
+      })),
+      skip_qc: forceSkipQc || skipQc,
+    };
+    if (inspectionId) {
       return apiJson<{ data: { id: number } }>("/api/v2/jobs/inspections", {
-        method: "POST",
-        body: JSON.stringify(payload),
+        method: "PUT",
+        body: JSON.stringify({ ...payload, inspection_id: inspectionId }),
       });
-    },
+    }
+    return apiJson<{ data: { id: number } }>("/api/v2/jobs/inspections", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  const saveMutation = useMutation({
+    mutationFn: () => persistInspection(false),
     onSuccess: (res) => {
       toast.success(
         skipQc
@@ -328,6 +332,21 @@ export function VehicleInspectionForm({
       setNewPhotos([]);
       void queryClient.invalidateQueries({ queryKey: ["inspection", jobId] });
       void queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const sendToCompletedMutation = useMutation({
+    mutationFn: () => persistInspection(true),
+    onSuccess: (res) => {
+      toast.success("Sent to Completed");
+      if (res?.data?.id) setInspectionId(res.data.id);
+      setNewPhotos([]);
+      void queryClient.invalidateQueries({ queryKey: ["inspection", jobId] });
+      void queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      void queryClient.invalidateQueries({ queryKey: ["jobs-complete"] });
+      void queryClient.invalidateQueries({ queryKey: ["jobs-qc"] });
+      router.push("/jobs/complete");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -692,7 +711,9 @@ export function VehicleInspectionForm({
             <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
               <Button
                 size="lg"
-                disabled={saveMutation.isPending}
+                disabled={
+                  saveMutation.isPending || sendToCompletedMutation.isPending
+                }
                 onClick={() => saveMutation.mutate()}
               >
                 {saveMutation.isPending
@@ -704,13 +725,18 @@ export function VehicleInspectionForm({
                       : "Save inspection"}
               </Button>
               {!skipQc ? (
-                <LinkButton
-                  href={`/jobs/inspect/${jobId}?type=${encodeURIComponent(vehicleType ?? kind)}&skip_qc=1`}
+                <Button
                   variant="outline"
                   size="lg"
+                  disabled={
+                    saveMutation.isPending || sendToCompletedMutation.isPending
+                  }
+                  onClick={() => sendToCompletedMutation.mutate()}
                 >
-                  Skip QC
-                </LinkButton>
+                  {sendToCompletedMutation.isPending
+                    ? "Sending…"
+                    : "Send to Completed"}
+                </Button>
               ) : null}
               <p className="w-full text-xs text-muted-foreground sm:w-auto">
                 Inspections are logged and reviewed for quality assurance.

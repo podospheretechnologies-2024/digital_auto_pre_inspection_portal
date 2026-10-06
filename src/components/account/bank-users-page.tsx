@@ -1,11 +1,16 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
+import {
+  CrudActionButton,
+  CrudActionGroup,
+} from "@/components/ui/crud-action-button";
 import {
   Card,
   CardContent,
@@ -159,6 +164,21 @@ export function BankUsersPage() {
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) =>
+      apiJson("/api/v2/account/bank-users", {
+        method: "DELETE",
+        body: JSON.stringify({ id }),
+      }),
+    onSuccess: async () => {
+      toast.success("Bank user deleted");
+      await queryClient.invalidateQueries({
+        queryKey: ["account-bank-users"],
+      });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   const canSubmit =
     form.first_name.trim() &&
     form.last_name.trim() &&
@@ -219,13 +239,29 @@ export function BankUsersPage() {
                     <TableCell>{row.bank}</TableCell>
                     <TableCell>{row.city}</TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => openEdit(row)}
-                      >
-                        Edit
-                      </Button>
+                      <CrudActionGroup>
+                        <CrudActionButton
+                          tone="edit"
+                          icon={Pencil}
+                          label="Edit"
+                          onClick={() => openEdit(row)}
+                        />
+                        <CrudActionButton
+                          tone="delete"
+                          icon={Trash2}
+                          label="Delete"
+                          disabled={deleteMutation.isPending}
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                `Delete ${row.first_name} ${row.last_name}?`,
+                              )
+                            ) {
+                              deleteMutation.mutate(row.id);
+                            }
+                          }}
+                        />
+                      </CrudActionGroup>
                     </TableCell>
                   </TableRow>
                 ))}

@@ -31,22 +31,28 @@ import {
 import { cn } from "@/lib/utils";
 
 const jobActionVariants = cva(
-  "inline-flex size-8 shrink-0 items-center justify-center rounded-md p-0 shadow-none transition-colors",
+  "inline-flex size-8 shrink-0 items-center justify-center rounded-lg border p-0 shadow-none transition-colors disabled:opacity-50",
   {
     variants: {
       tone: {
         primary:
-          "border-transparent bg-primary text-primary-foreground hover:bg-primary/90",
+          "border-primary/25 bg-primary/10 text-primary hover:border-primary/40 hover:bg-primary/15",
         outline:
-          "border border-border bg-background text-foreground hover:bg-muted",
+          "border-border bg-background text-foreground hover:bg-muted",
         success:
-          "border-transparent bg-emerald-600 text-white hover:bg-emerald-700",
+          "border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100 hover:text-emerald-800",
         warning:
-          "border-transparent bg-amber-500 text-white hover:bg-amber-600",
+          "border-amber-200 bg-amber-50 text-amber-800 hover:border-amber-300 hover:bg-amber-100 hover:text-amber-900",
         danger:
-          "border-transparent bg-red-600 text-white hover:bg-red-700",
+          "border-red-200 bg-red-50 text-red-700 hover:border-red-300 hover:bg-red-100 hover:text-red-800",
+        info:
+          "border-sky-200 bg-sky-50 text-sky-700 hover:border-sky-300 hover:bg-sky-100 hover:text-sky-800",
+        edit:
+          "border-violet-200 bg-violet-50 text-violet-700 hover:border-violet-300 hover:bg-violet-100 hover:text-violet-800",
+        history:
+          "border-teal-200 bg-teal-50 text-teal-700 hover:border-teal-300 hover:bg-teal-100 hover:text-teal-800",
         muted:
-          "border border-border/80 bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground",
+          "border-border/80 bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground",
       },
     },
     defaultVariants: {
@@ -63,7 +69,9 @@ export function JobsListingCard({
   title,
   description,
   count,
+  totalCount,
   toolbar,
+  filters,
   loading,
   error,
   empty,
@@ -72,25 +80,40 @@ export function JobsListingCard({
 }: {
   title: string;
   description?: string;
+  /** Visible / filtered row count */
   count?: number;
+  /** Unfiltered total (shows “Showing X of Y” when different) */
+  totalCount?: number;
   toolbar?: ReactNode;
+  /** Filter bar rendered above the table */
+  filters?: ReactNode;
   loading?: boolean;
   error?: string | null;
   empty?: string;
   children?: ReactNode;
   className?: string;
 }) {
+  const showingFiltered =
+    typeof count === "number" &&
+    typeof totalCount === "number" &&
+    count !== totalCount;
+
   return (
     <Card className={cn("overflow-hidden border-border/70 shadow-sm", className)}>
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0 border-b border-border/70 bg-muted/15 px-4 py-2.5">
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <CardTitle className="text-[14px] leading-none font-semibold">
               {title}
             </CardTitle>
             {typeof count === "number" && !loading ? (
               <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/10 px-1.5 text-[11px] font-semibold tabular-nums text-primary">
                 {count}
+              </span>
+            ) : null}
+            {showingFiltered && !loading ? (
+              <span className="text-[11px] text-muted-foreground">
+                Showing {count} of {totalCount}
               </span>
             ) : null}
           </div>
@@ -104,6 +127,7 @@ export function JobsListingCard({
           <div className="flex flex-wrap items-center gap-2">{toolbar}</div>
         ) : null}
       </CardHeader>
+      {filters}
       <CardContent className="p-0">
         {loading ? (
           <div className="px-4 py-10 text-center text-sm text-muted-foreground">
@@ -114,7 +138,7 @@ export function JobsListingCard({
             {error}
           </div>
         ) : children ? (
-          children
+          <div className="max-h-[min(70vh,52rem)] overflow-auto">{children}</div>
         ) : (
           <JobsEmptyState message={empty ?? "No cases found"} />
         )}
@@ -146,7 +170,7 @@ export function JobsTable({
 
 export function JobsTableHeader({ children }: { children: ReactNode }) {
   return (
-    <TableHeader className="bg-slate-50/90 dark:bg-muted/40 [&_tr]:border-border/70">
+    <TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm dark:bg-muted/80 [&_tr]:border-border/70">
       {children}
     </TableHeader>
   );
@@ -226,7 +250,7 @@ export function JobMetaLine({ children }: { children?: ReactNode }) {
 
 export function JobActions({ children }: { children: ReactNode }) {
   return (
-    <div className="flex flex-nowrap items-center justify-end gap-1">
+    <div className="flex flex-nowrap items-center justify-end gap-1.5">
       {children}
     </div>
   );

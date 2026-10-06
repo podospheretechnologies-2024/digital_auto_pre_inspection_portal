@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import type { WheelKind } from "@/lib/jobs/helpers";
 import type { QcSubmitInput } from "@/lib/jobs/schemas";
+import { logJobHistory } from "@/lib/services/job-history";
 import type { SessionUser } from "@/types/next-auth";
 
 export type QcQueueItem = {
@@ -19,6 +20,11 @@ export type QcQueueItem = {
   /** When QC approved / completed */
   qc_datetime: Date | null;
   cdate: Date | null;
+  /** Job create (intimation) timestamp */
+  job_created_at: Date | null;
+  assigned_at: Date | null;
+  hold_at: Date | null;
+  cancelled_at: Date | null;
   cname: string | null;
   mobileno: string | null;
   dti_no: string | null;
@@ -74,33 +80,87 @@ async function enrichQcRows(
     agents.map((a) => [a.id, `${a.first_name} ${a.last_name}`.trim()]),
   );
 
-  return rows.map((row) => {
-    const job = row.job_id ? jobMap.get(row.job_id) : undefined;
-    return {
-      id: row.id,
-      job_id: row.job_id,
-      vehicle_type: kind,
-      vehicleno: row.vehicleno ?? job?.vehicleno ?? null,
-      proposer: row.proposer,
-      inspection_status: row.inspection_status,
-      remarks: row.remarks,
-      valuation_price: row.valuation_price,
-      ownership_name: row.ownership_name,
-      qc: row.qc,
-      created_at: row.created_at,
-      qc_datetime: row.qc_datetime ?? null,
-      cdate: job?.cdate ?? null,
-      cname: job?.cname ?? null,
-      mobileno: job?.mobileno ?? null,
-      dti_no: job?.dti_no ?? null,
-      bank_ref_no: job?.bank_ref_no ?? null,
-      bankname: job?.bank_id ? (bankMap.get(job.bank_id) ?? "—") : "—",
-      company: job?.company_id ? (companyMap.get(job.company_id) ?? "—") : "—",
-      model: job?.model_id ? (modelMap.get(job.model_id) ?? "—") : "—",
-      variant: job?.variant_id ? (variantMap.get(job.variant_id) ?? "—") : "—",
-      agent_name: job?.agent_id ? (agentMap.get(job.agent_id) ?? "—") : "—",
-    };
+  return rows
+    .filter((row) => {
+      if (row.job_id == null || !jobMap.has(row.job_id)) return false;
+      const job = jobMap.get(row.job_id)!;
+      // Held / cancelled jobs belong on Hold / Cancel desks, not QC
+      if (Number(job.on_hold ?? 0) === 1) return false;
+      if (Number(job.is_deleted ?? 0) === 1) return false;
+      return true;
+    })
+    .map((row) => {
+      const job = jobMap.get(row.job_id!)!;
+      return {
+        id: row.id,
+        job_id: row.job_id,
+        vehicle_type: kind,
+        vehicleno: row.vehicleno ?? job.vehicleno ?? null,
+        proposer: row.proposer,
+        inspection_status: row.inspection_status,
+        remarks: row.remarks,
+        valuation_price: row.valuation_price,
+        ownership_name: row.ownership_name,
+        qc: row.qc,
+        created_at: row.created_at,
+        qc_datetime: row.qc_datetime ?? null,
+        cdate: job.cdate ?? null,
+        job_created_at: job.created_at ?? null,
+        assigned_at: job.assigned_at ?? null,
+        hold_at: job.hold_at ?? null,
+        cancelled_at: job.cancelled_at ?? null,
+        cname: job.cname ?? null,
+        mobileno: job.mobileno ?? null,
+        dti_no: job.dti_no ?? null,
+        bank_ref_no: job.bank_ref_no ?? null,
+        bankname: job.bank_id ? (bankMap.get(job.bank_id) ?? "—") : "—",
+        company: job.company_id ? (companyMap.get(job.company_id) ?? "—") : "—",
+        model: job.model_id ? (modelMap.get(job.model_id) ?? "—") : "—",
+        variant: job.variant_id ? (variantMap.get(job.variant_id) ?? "—") : "—",
+        agent_name: job.agent_id ? (agentMap.get(job.agent_id) ?? "—") : "—",
+      };
+    });
+}
+
+/** Delete unlinked inspection copies left behind by stage moves / bad syncs. */
+async function purgeOrphanInspections(kind: WheelKind): Promise<void> {
+  const where = { job_id: null as null };
+  if (kind === "2wheeler") {
+    const orphans = await db.tbl_2wheeler.findMany({
+      where,
+      select: { id: true },
+    });
+    if (!orphans.length) return;
+    const ids = orphans.map((o) => o.id);
+    await db.tbl_2wheeler_images.deleteMany({
+      where: { parent_id: { in: ids } },
+    });
+    await db.tbl_2wheeler.deleteMany({ where: { id: { in: ids } } });
+    return;
+  }
+  if (kind === "3wheeler") {
+    const orphans = await db.tbl_3wheeler.findMany({
+      where,
+      select: { id: true },
+    });
+    if (!orphans.length) return;
+    const ids = orphans.map((o) => o.id);
+    await db.tbl_3wheeler_images.deleteMany({
+      where: { parent_id: { in: ids } },
+    });
+    await db.tbl_3wheeler.deleteMany({ where: { id: { in: ids } } });
+    return;
+  }
+  const orphans = await db.tbl_4wheeler.findMany({
+    where,
+    select: { id: true },
   });
+  if (!orphans.length) return;
+  const ids = orphans.map((o) => o.id);
+  await db.tbl_4wheeler_images.deleteMany({
+    where: { parent_id: { in: ids } },
+  });
+  await db.tbl_4wheeler.deleteMany({ where: { id: { in: ids } } });
 }
 
 /** List inspections pending QC (qc = 0). Laravel 2wqc / 3wqc / 4wqc. */
@@ -132,23 +192,26 @@ export async function listQcQueue(opts?: {
   } as const;
 
   for (const kind of kinds) {
+    // Remove already-created orphan copies, then list only linked cases
+    await purgeOrphanInspections(kind);
+    const where = { qc: 0, job_id: { not: null } } as const;
     const rows =
       kind === "2wheeler"
         ? await db.tbl_2wheeler.findMany({
-            where: { qc: 0 },
+            where,
             take: limit,
             orderBy: { created_at: "desc" },
             select,
           })
         : kind === "3wheeler"
           ? await db.tbl_3wheeler.findMany({
-              where: { qc: 0 },
+              where,
               take: limit,
               orderBy: { created_at: "desc" },
               select,
             })
           : await db.tbl_4wheeler.findMany({
-              where: { qc: 0 },
+              where,
               take: limit,
               orderBy: { created_at: "desc" },
               select,
@@ -215,22 +278,34 @@ export async function submitQc(user: SessionUser, input: QcSubmitInput) {
     updated_at: now,
   };
 
-  if (input.vehicle_type === "2wheeler") {
-    return db.tbl_2wheeler.update({
-      where: { id: input.inspection_id },
-      data,
+  const updated =
+    input.vehicle_type === "2wheeler"
+      ? await db.tbl_2wheeler.update({
+          where: { id: input.inspection_id },
+          data,
+        })
+      : input.vehicle_type === "3wheeler"
+        ? await db.tbl_3wheeler.update({
+            where: { id: input.inspection_id },
+            data,
+          })
+        : await db.tbl_4wheeler.update({
+            where: { id: input.inspection_id },
+            data,
+          });
+
+  if (updated.job_id != null) {
+    await logJobHistory({
+      jobId: updated.job_id,
+      userId: Number(user.id),
+      event: "Quality Check",
+      remark: input.remarks?.trim()
+        ? input.remarks.trim()
+        : "Quality check completed for this case",
     });
   }
-  if (input.vehicle_type === "3wheeler") {
-    return db.tbl_3wheeler.update({
-      where: { id: input.inspection_id },
-      data,
-    });
-  }
-  return db.tbl_4wheeler.update({
-    where: { id: input.inspection_id },
-    data,
-  });
+
+  return updated;
 }
 
 /** Done lists (qc = 1) for reports / admin review. */
@@ -254,23 +329,24 @@ export async function listQcDone(opts?: {
     qc_datetime: true,
   } as const;
 
+  const where = { qc: 1, job_id: { not: null } } as const;
   const rows =
     kind === "2wheeler"
       ? await db.tbl_2wheeler.findMany({
-          where: { qc: 1 },
+          where,
           take: limit,
           orderBy: { created_at: "desc" },
           select,
         })
       : kind === "3wheeler"
         ? await db.tbl_3wheeler.findMany({
-            where: { qc: 1 },
+            where,
             take: limit,
             orderBy: { created_at: "desc" },
             select,
           })
         : await db.tbl_4wheeler.findMany({
-            where: { qc: 1 },
+            where,
             take: limit,
             orderBy: { created_at: "desc" },
             select,

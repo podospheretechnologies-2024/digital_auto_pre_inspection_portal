@@ -127,7 +127,7 @@ export async function changeAccountEmail(userId: number, email: string) {
 
 export async function listBankUsers() {
   const users = await db.users.findMany({
-    where: { type: "Bank" },
+    where: { type: "Bank", is_deleted: 0 },
     orderBy: { first_name: "asc" },
   });
 
@@ -173,7 +173,7 @@ export async function getBankUserLookups() {
 
 export async function getBankUser(id: number) {
   const user = await db.users.findFirst({
-    where: { id, type: "Bank", is_admin: 0 },
+    where: { id, type: "Bank", is_admin: 0, is_deleted: 0 },
   });
   if (!user) return null;
 
@@ -206,6 +206,9 @@ export async function createBankUser(input: BankUserCreateInput) {
         bank_id: input.bank,
         type: "Bank",
         is_admin: 0,
+        is_deleted: 0,
+        status: "Active",
+        verified_at: now,
         password: passwordHash,
         created_at: now,
         updated_at: now,
@@ -238,7 +241,7 @@ export async function updateBankUser(input: BankUserUpdateInput) {
 
   try {
     const updated = await db.users.updateMany({
-      where: { id: input.id, type: "Bank", is_admin: 0 },
+      where: { id: input.id, type: "Bank", is_admin: 0, is_deleted: 0 },
       data: {
         first_name: input.first_name,
         last_name: input.last_name,
@@ -280,5 +283,15 @@ export async function updateBankUser(input: BankUserUpdateInput) {
       throw new Error("EMAIL_TAKEN");
     }
     throw error;
+  }
+}
+
+export async function softDeleteBankUser(id: number) {
+  const updated = await db.users.updateMany({
+    where: { id, type: "Bank", is_admin: 0, is_deleted: 0 },
+    data: { is_deleted: 1, updated_at: new Date() },
+  });
+  if (updated.count === 0) {
+    throw new Error("NOT_FOUND");
   }
 }
