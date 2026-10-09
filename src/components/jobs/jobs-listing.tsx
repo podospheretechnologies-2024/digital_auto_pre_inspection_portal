@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import type { ComponentProps, ReactNode } from "react";
+import { useEffect, useState, type ComponentProps, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { Inbox } from "lucide-react";
+import { ChevronLeft, ChevronRight, Inbox, Building2, Calendar, Clock, Phone, UserRound, Zap, UserPlus, ShieldCheck, CheckCircle2, CirclePause, Ban, ClipboardList } from "lucide-react";
 import type { VariantProps } from "class-variance-authority";
 import { cva } from "class-variance-authority";
 
@@ -28,31 +28,29 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  ActionOverflow,
+  useInActionMenu,
+} from "@/components/ui/action-overflow";
 import { cn } from "@/lib/utils";
 
 const jobActionVariants = cva(
-  "inline-flex size-8 shrink-0 items-center justify-center rounded-lg border p-0 shadow-none transition-colors disabled:opacity-50",
+  "inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-transparent p-0 text-white shadow-none transition-colors disabled:opacity-50",
   {
     variants: {
       tone: {
-        primary:
-          "border-primary/25 bg-primary/10 text-primary hover:border-primary/40 hover:bg-primary/15",
-        outline:
-          "border-border bg-background text-foreground hover:bg-muted",
-        success:
-          "border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100 hover:text-emerald-800",
-        warning:
-          "border-amber-200 bg-amber-50 text-amber-800 hover:border-amber-300 hover:bg-amber-100 hover:text-amber-900",
-        danger:
-          "border-red-200 bg-red-50 text-red-700 hover:border-red-300 hover:bg-red-100 hover:text-red-800",
-        info:
-          "border-sky-200 bg-sky-50 text-sky-700 hover:border-sky-300 hover:bg-sky-100 hover:text-sky-800",
-        edit:
-          "border-violet-200 bg-violet-50 text-violet-700 hover:border-violet-300 hover:bg-violet-100 hover:text-violet-800",
-        history:
-          "border-teal-200 bg-teal-50 text-teal-700 hover:border-teal-300 hover:bg-teal-100 hover:text-teal-800",
-        muted:
-          "border-border/80 bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground",
+        primary: "bg-blue-600 text-white hover:bg-blue-700",
+        outline: "bg-slate-600 text-white hover:bg-slate-700",
+        success: "bg-emerald-600 text-white hover:bg-emerald-700",
+        warning: "bg-amber-500 text-white hover:bg-amber-600",
+        danger: "bg-red-600 text-white hover:bg-red-700",
+        info: "bg-sky-600 text-white hover:bg-sky-700",
+        edit: "bg-violet-600 text-white hover:bg-violet-700",
+        history: "bg-teal-600 text-white hover:bg-teal-700",
+        stage: "bg-orange-500 text-white hover:bg-orange-600",
+        view: "bg-cyan-600 text-white hover:bg-cyan-700",
+        pdf: "bg-fuchsia-600 text-white hover:bg-fuchsia-700",
+        muted: "bg-slate-500 text-white hover:bg-slate-600",
       },
     },
     defaultVariants: {
@@ -65,16 +63,141 @@ type JobActionTone = NonNullable<
   VariantProps<typeof jobActionVariants>["tone"]
 >;
 
+const jobActionToneClass: Record<JobActionTone, string> = {
+  primary: "bg-blue-600",
+  outline: "bg-slate-600",
+  success: "bg-emerald-600",
+  warning: "bg-amber-500",
+  danger: "bg-red-600",
+  info: "bg-sky-600",
+  edit: "bg-violet-600",
+  history: "bg-teal-600",
+  stage: "bg-orange-500",
+  view: "bg-cyan-600",
+  pdf: "bg-fuchsia-600",
+  muted: "bg-slate-500",
+};
+
+const actionMenuRow =
+  "inline-flex h-9 w-full shrink-0 cursor-pointer items-center justify-start gap-2 rounded-lg border-0 bg-transparent px-2 text-left text-[13px] font-medium text-foreground shadow-none hover:bg-muted";
+
+export type SectionMark =
+  | "fresh"
+  | "assigned"
+  | "qc"
+  | "hold"
+  | "complete"
+  | "cancel"
+  | "pending"
+  | "all";
+
+const sectionMarks: Record<
+  SectionMark,
+  { label: string; icon: LucideIcon; tint: string; ink: string }
+> = {
+  fresh: {
+    label: "Fresh cases",
+    icon: Zap,
+    tint: "bg-lightprimary",
+    ink: "text-info",
+  },
+  assigned: {
+    label: "Assigned",
+    icon: UserPlus,
+    tint: "bg-lightsecondary",
+    ink: "text-info",
+  },
+  qc: {
+    label: "Quality check",
+    icon: ShieldCheck,
+    tint: "bg-lightwarning",
+    ink: "text-warn",
+  },
+  hold: {
+    label: "Hold",
+    icon: CirclePause,
+    tint: "bg-amber-50 dark:bg-amber-500/15",
+    ink: "text-amber-700 dark:text-amber-300",
+  },
+  complete: {
+    label: "Completed",
+    icon: CheckCircle2,
+    tint: "bg-lightsuccess",
+    ink: "text-ok",
+  },
+  cancel: {
+    label: "Cancel",
+    icon: Ban,
+    tint: "bg-red-50 dark:bg-red-500/15",
+    ink: "text-red-700 dark:text-red-300",
+  },
+  pending: {
+    label: "Pending",
+    icon: Clock,
+    tint: "bg-lightprimary",
+    ink: "text-info",
+  },
+  all: {
+    label: "All jobs",
+    icon: ClipboardList,
+    tint: "bg-lightsecondary",
+    ink: "text-info",
+  },
+};
+
+function SectionAnalytics({
+  mark,
+  value,
+}: {
+  mark: SectionMark;
+  value: number;
+}) {
+  const item = sectionMarks[mark];
+  const Icon = item.icon;
+  return (
+    <div
+      className={cn(
+        "flex shrink-0 items-center gap-2.5 rounded-lg px-2.5 py-1.5",
+        item.tint,
+      )}
+    >
+      <span
+        className={cn(
+          "flex size-8 items-center justify-center rounded-full bg-background/80",
+          item.ink,
+        )}
+      >
+        <Icon className="size-4" />
+      </span>
+      <span className="min-w-0 leading-tight">
+        <span className={cn("block text-[11px] font-semibold", item.ink)}>
+          {item.label}
+        </span>
+        <span
+          className={cn(
+            "block text-[15px] font-semibold tabular-nums leading-none",
+            item.ink,
+          )}
+        >
+          {value.toLocaleString()}
+        </span>
+      </span>
+    </div>
+  );
+}
+
 export function JobsListingCard({
   title,
   description,
   count,
   totalCount,
+  mark,
   toolbar,
   filters,
   loading,
   error,
   empty,
+  footer,
   children,
   className,
 }: {
@@ -84,12 +207,15 @@ export function JobsListingCard({
   count?: number;
   /** Unfiltered total (shows “Showing X of Y” when different) */
   totalCount?: number;
+  /** Section analytics chip on the right of the list header */
+  mark?: SectionMark;
   toolbar?: ReactNode;
   /** Filter bar rendered above the table */
   filters?: ReactNode;
   loading?: boolean;
   error?: string | null;
   empty?: string;
+  footer?: ReactNode;
   children?: ReactNode;
   className?: string;
 }) {
@@ -99,14 +225,14 @@ export function JobsListingCard({
     count !== totalCount;
 
   return (
-    <Card className={cn("overflow-hidden border-border/70 shadow-sm", className)}>
-      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0 border-b border-border/70 bg-muted/15 px-4 py-2.5">
+    <Card className={cn("overflow-hidden rounded-2xl border-border/70 shadow-sm", className)}>
+      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0 border-b border-border/70 bg-muted/20 px-4 py-3 sm:px-5">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <CardTitle className="text-[14px] leading-none font-semibold">
               {title}
             </CardTitle>
-            {typeof count === "number" && !loading ? (
+            {typeof count === "number" && !loading && !mark ? (
               <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/10 px-1.5 text-[11px] font-semibold tabular-nums text-primary">
                 {count}
               </span>
@@ -123,9 +249,12 @@ export function JobsListingCard({
             </CardDescription>
           ) : null}
         </div>
-        {toolbar ? (
-          <div className="flex flex-wrap items-center gap-2">{toolbar}</div>
-        ) : null}
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+          {toolbar}
+          {mark && !loading && typeof (totalCount ?? count) === "number" ? (
+            <SectionAnalytics mark={mark} value={(totalCount ?? count) as number} />
+          ) : null}
+        </div>
       </CardHeader>
       {filters}
       <CardContent className="p-0">
@@ -138,10 +267,11 @@ export function JobsListingCard({
             {error}
           </div>
         ) : children ? (
-          <div className="max-h-[min(70vh,52rem)] overflow-auto">{children}</div>
+          <div>{children}</div>
         ) : (
           <JobsEmptyState message={empty ?? "No cases found"} />
         )}
+        {!loading && !error ? footer : null}
       </CardContent>
     </Card>
   );
@@ -170,7 +300,7 @@ export function JobsTable({
 
 export function JobsTableHeader({ children }: { children: ReactNode }) {
   return (
-    <TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm dark:bg-muted/80 [&_tr]:border-border/70">
+    <TableHeader className="sticky top-0 z-10 bg-muted/50 backdrop-blur-sm [&_tr]:border-border/70">
       {children}
     </TableHeader>
   );
@@ -239,19 +369,214 @@ export function JobDtiCell({ value }: { value?: string | number | null }) {
   );
 }
 
-export function JobMetaLine({ children }: { children?: ReactNode }) {
+export function JobMetaLine({
+  children,
+  full = false,
+}: {
+  children?: ReactNode;
+  full?: boolean;
+}) {
   if (!children) return null;
   return (
-    <div className="mt-0.5 max-w-[12rem] truncate text-[11px] text-muted-foreground">
+    <div
+      className={cn(
+        "mt-0.5 text-[11px] leading-snug text-muted-foreground",
+        full ? "whitespace-normal break-words" : "max-w-[12rem] truncate",
+      )}
+    >
       {children}
     </div>
   );
 }
 
-export function JobActions({ children }: { children: ReactNode }) {
+function deskParts(value: Date | string | null | undefined) {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
+}
+
+export function SheetDateTime({
+  value,
+}: {
+  value?: Date | string | null;
+}) {
+  const date = deskParts(value);
+  const dateLabel = date
+    ? date.toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
+    : "—";
+  const timeLabel = date
+    ? date.toLocaleTimeString("en-IN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      })
+    : "—";
+
   return (
-    <div className="flex flex-nowrap items-center justify-end gap-1.5">
-      {children}
+    <div className="space-y-0.5">
+      <div className="flex items-center gap-1.5 text-[12px] text-foreground">
+        <Calendar className="size-3.5 shrink-0 text-sky-600" />
+        <span className="tabular-nums">{dateLabel}</span>
+      </div>
+      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <Clock className="size-3.5 shrink-0 text-amber-600" />
+        <span className="tabular-nums">{timeLabel}</span>
+      </div>
+    </div>
+  );
+}
+
+export function SheetPerson({
+  name,
+  phone,
+}: {
+  name?: string | null;
+  phone?: string | null;
+}) {
+  return (
+    <div className="min-w-0">
+      <div className="flex items-center gap-1.5 font-medium text-foreground">
+        <UserRound className="size-3.5 shrink-0 text-violet-600" />
+        <span className="truncate">{name || "—"}</span>
+      </div>
+      {phone ? (
+        <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          <Phone className="size-3 shrink-0 text-emerald-600" />
+          <span className="truncate">{phone}</span>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function SheetBank({
+  name,
+  meta,
+}: {
+  name?: string | null;
+  meta?: string | null;
+}) {
+  return (
+    <div className="min-w-0">
+      <div className="flex items-center gap-1.5 font-medium text-foreground">
+        <Building2 className="size-3.5 shrink-0 text-orange-600" />
+        <span className="max-w-[150px] truncate" title={name ?? undefined}>
+          {name || "—"}
+        </span>
+      </div>
+      {meta ? <JobMetaLine>{meta}</JobMetaLine> : null}
+    </div>
+  );
+}
+
+export function JobActions({ children }: { children: ReactNode }) {
+  return <ActionOverflow>{children}</ActionOverflow>;
+}
+
+export const SHEET_PAGE_SIZE = 10;
+
+export function useSheetPage<T extends { id?: number | string | null }>(
+  items: T[],
+) {
+  const [page, setPage] = useState(1);
+  const signature = items.map((item) => item.id ?? "").join(",");
+  const pageCount = Math.max(1, Math.ceil(items.length / SHEET_PAGE_SIZE));
+
+  useEffect(() => {
+    setPage(1);
+  }, [signature]);
+
+  const safePage = Math.min(Math.max(page, 1), pageCount);
+  const start = (safePage - 1) * SHEET_PAGE_SIZE;
+
+  return {
+    page: safePage,
+    pageCount,
+    start,
+    pageItems: items.slice(start, start + SHEET_PAGE_SIZE),
+    setPage: (next: number) =>
+      setPage(Math.min(Math.max(1, next), pageCount)),
+    total: items.length,
+  };
+}
+
+export function SheetPager({
+  page,
+  pageCount,
+  onPage,
+}: {
+  page: number;
+  pageCount: number;
+  onPage: (page: number) => void;
+}) {
+  if (pageCount <= 1) return null;
+
+  const pages: Array<number | "gap"> = [];
+  if (pageCount <= 7) {
+    for (let n = 1; n <= pageCount; n += 1) pages.push(n);
+  } else {
+    pages.push(1);
+    const from = Math.max(2, page - 1);
+    const to = Math.min(pageCount - 1, page + 1);
+    if (from > 2) pages.push("gap");
+    for (let n = from; n <= to; n += 1) pages.push(n);
+    if (to < pageCount - 1) pages.push("gap");
+    pages.push(pageCount);
+  }
+
+  const buttonClass =
+    "inline-flex h-8 min-w-8 items-center justify-center rounded-md border border-border bg-background px-2 text-[12px] font-medium text-foreground transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-40";
+
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-1.5 border-t border-border/70 px-3 py-2.5">
+      <button
+        type="button"
+        className={buttonClass}
+        aria-label="Previous page"
+        disabled={page <= 1}
+        onClick={() => onPage(page - 1)}
+      >
+        <ChevronLeft className="size-4" />
+      </button>
+      {pages.map((item, index) =>
+        item === "gap" ? (
+          <span
+            key={`gap-${index}`}
+            className="px-1 text-[12px] text-muted-foreground"
+          >
+            …
+          </span>
+        ) : (
+          <button
+            key={item}
+            type="button"
+            aria-label={`Page ${item}`}
+            aria-current={item === page ? "page" : undefined}
+            className={cn(
+              buttonClass,
+              item === page &&
+                "border-primary bg-primary text-primary-foreground hover:bg-primary/90",
+            )}
+            onClick={() => onPage(item)}
+          >
+            {item}
+          </button>
+        ),
+      )}
+      <button
+        type="button"
+        className={buttonClass}
+        aria-label="Next page"
+        disabled={page >= pageCount}
+        onClick={() => onPage(page + 1)}
+      >
+        <ChevronRight className="size-4" />
+      </button>
     </div>
   );
 }
@@ -272,6 +597,27 @@ export function JobActionButton({
   className,
   ...props
 }: JobActionButtonProps) {
+  const inMenu = useInActionMenu();
+  if (inMenu) {
+    return (
+      <Button
+        variant="ghost"
+        aria-label={label}
+        className={cn(actionMenuRow, className)}
+        {...props}
+      >
+        <span
+          className={cn(
+            "inline-flex size-7 shrink-0 items-center justify-center rounded-md text-white",
+            jobActionToneClass[tone],
+          )}
+        >
+          <Icon className="size-3.5 shrink-0" strokeWidth={2.25} />
+        </span>
+        <span className="truncate">{label}</span>
+      </Button>
+    );
+  }
   return (
     <Tooltip>
       <TooltipTrigger
@@ -309,6 +655,26 @@ export function JobActionLink({
   className,
   ...props
 }: JobActionLinkProps) {
+  const inMenu = useInActionMenu();
+  if (inMenu) {
+    return (
+      <Link
+        aria-label={label}
+        className={cn(actionMenuRow, className)}
+        {...props}
+      >
+        <span
+          className={cn(
+            "inline-flex size-7 shrink-0 items-center justify-center rounded-md text-white",
+            jobActionToneClass[tone],
+          )}
+        >
+          <Icon className="size-3.5 shrink-0" strokeWidth={2.25} />
+        </span>
+        <span className="truncate">{label}</span>
+      </Link>
+    );
+  }
   return (
     <Tooltip>
       <TooltipTrigger

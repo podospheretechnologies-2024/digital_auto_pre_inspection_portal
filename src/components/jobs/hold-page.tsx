@@ -1,16 +1,17 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Ban, Eye, Play } from "lucide-react";
+import { Play } from "lucide-react";
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
+import { refreshJobSheets } from "@/lib/jobs/refresh-sheets";
+import { toast } from "@/lib/toast";
 
 import { RegPlate } from "@/components/atlas/reg-plate";
 import { CaseListToolbar } from "@/components/jobs/case-list-toolbar";
 import { JobHistoryButton } from "@/components/jobs/job-history-button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   JobActionButton,
-  JobActionLink,
   JobActions,
   JobDtiCell,
   JobSerialCell,
@@ -21,17 +22,19 @@ import {
   JobsTableHead,
   JobsTableHeader,
   JobsTableRow,
+  SheetDateTime,
+  SheetPager,
+  SheetPerson,
   TableBody,
+  useSheetPage,
 } from "@/components/jobs/jobs-listing";
 import { PageHeader } from "@/components/layout/page-header";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   EMPTY_CASE_FILTERS,
   filterCaseRows,
   uniqueSorted,
   type CaseListFilterState,
 } from "@/lib/jobs/case-list-filters";
-import { formatDeskDate, inspectPathForJob } from "@/lib/jobs/helpers";
 
 type Row = {
   id: number;
@@ -62,12 +65,14 @@ async function apiJson<T>(url: string, init?: RequestInit): Promise<T> {
 
 export function HoldCasesPage() {
   const queryClient = useQueryClient();
-  const [cancelId, setCancelId] = useState<number | null>(null);
+  const [resumeId, setResumeId] = useState<number | null>(null);
   const [filters, setFilters] = useState<CaseListFilterState>(EMPTY_CASE_FILTERS);
   const listQuery = useQuery({
     queryKey: ["jobs-hold"],
     queryFn: () =>
-      apiJson<{ data: Row[] }>("/api/v2/jobs?list=hold&limit=100"),
+      apiJson<{ data: Row[] }>("/api/v2/jobs?list=hold&limit=100", {
+        cache: "no-store",
+      }),
   });
 
   const actionMutation = useMutation({
@@ -76,16 +81,16 @@ export function HoldCasesPage() {
       action,
     }: {
       id: number;
-      action: "resume" | "cancel";
+      action: "resume";
     }) =>
       apiJson(`/api/v2/jobs/${id}/workflow`, {
         method: "POST",
         body: JSON.stringify({ action }),
       }),
-    onSuccess: async (_d, vars) => {
-      toast.success(vars.action === "resume" ? "Resumed" : "Cancelled");
-      await queryClient.invalidateQueries({ queryKey: ["jobs-hold"] });
-    },
+      onSuccess: async () => {
+        toast.success("Resumed");
+        await refreshJobSheets(queryClient);
+      },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -102,6 +107,7 @@ export function HoldCasesPage() {
     () => filterCaseRows(allRows, filters, "hold"),
     [allRows, filters],
   );
+  const sheet = useSheetPage(rows);
 
   return (
     <>
@@ -117,6 +123,7 @@ export function HoldCasesPage() {
         description="Resume work or cancel cases that are no longer required"
         count={rows.length}
         totalCount={allRows.length}
+        mark="hold"
         loading={listQuery.isLoading}
         error={
           listQuery.isError ? (listQuery.error as Error).message : null
@@ -134,6 +141,15 @@ export function HoldCasesPage() {
             surveyors={surveyors}
           />
         }
+        footer={
+          rows.length > 0 ? (
+            <SheetPager
+              page={sheet.page}
+              pageCount={sheet.pageCount}
+              onPage={sheet.setPage}
+            />
+          ) : null
+        }
       >
         {rows.length > 0 ? (
           <JobsTable>
@@ -149,10 +165,10 @@ export function HoldCasesPage() {
               </JobsTableRow>
             </JobsTableHeader>
             <TableBody>
-              {rows.map((row, index) => {
+              {sheet.pageItems.map((row, index) => {
                 return (
                   <JobsTableRow key={row.id}>
-                    <JobSerialCell index={index} />
+                    <JobSerialCell index={sheet.start + index} />
                     <JobsTableCell>
                       <JobDtiCell value={row.dti_no ?? row.id} />
                     </JobsTableCell>
@@ -163,44 +179,25 @@ export function HoldCasesPage() {
                         "—"
                       )}
                     </JobsTableCell>
-                    <JobsTableCell className="font-medium">
-                      {row.cname ?? "—"}
-                    </JobsTableCell>
-                    <JobsTableCell>{row.agent_name ?? "—"}</JobsTableCell>
-                    <JobsTableCell className="tabular-nums text-muted-foreground">
-                      {formatDeskDate(row.hold_at ?? row.updated_at)}
+                    <JobsTableCell>
+                      <SheetPerson name={row.cname} />
                     </JobsTableCell>
                     <JobsTableCell>
-                      <JobActions>
-                        <JobActionLink
-                          href={inspectPathForJob(row.id, row.vehicle_type, {
-                            mode: row.inspection_id ? "edit" : "create",
-                          })}
-                          tone="info"
-                          icon={Eye}
-                          label="Open"
-                        />
-                        <JobActionButton
-                          tone="success"
-                          icon={Play}
-                          label="Resume"
-                          disabled={actionMutation.isPending}
-                          onClick={() =>
-                            actionMutation.mutate({
-                              id: row.id,
-                              action: "resume",
-                            })
-                          }
-                        />
-                        <JobHistoryButton stage="hold" job={row} />
-                        <JobActionButton
-                          tone="danger"
-                          icon={Ban}
-                          label="Cancel"
-                          disabled={actionMutation.isPending}
-                          onClick={() => setCancelId(row.id)}
-                        />
-                      </JobActions>
+                      <SheetPerson name={row.agent_name} />
+                    </JobsTableCell>
+                    <JobsTableCell>
+                      <SheetDateTime value={row.hold_at ?? row.updated_at} />
+                    </JobsTableCell>
+                    <JobsTableCell>
+                    <JobActions>
+                      <JobActionButton
+                        tone="success"
+                        icon={Play}
+                        label="Resume"
+                        disabled={actionMutation.isPending}
+                        onClick={() => setResumeId(row.id)}
+                      />
+                    </JobActions>
                     </JobsTableCell>
                   </JobsTableRow>
                 );
@@ -211,24 +208,25 @@ export function HoldCasesPage() {
       </JobsListingCard>
 
       <ConfirmDialog
-        open={cancelId != null}
-        onOpenChange={(open) => {
-          if (!open) setCancelId(null);
+         open={resumeId != null}
+         onOpenChange={(open) => {
+          if (!open) setResumeId(null);
         }}
-        tone="danger"
-        title="Cancel this case?"
-        description="The case will move to the Cancel queue. You can restore it later if needed."
-        confirmLabel="Cancel case"
-        cancelLabel="Keep case"
+        tone="default"
+        title="Resume this case?"
+        description="The case will return to the active workflow."
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
         loading={actionMutation.isPending}
         onConfirm={() => {
-          if (cancelId == null) return;
+          if (resumeId == null) return;
           actionMutation.mutate(
-            { id: cancelId, action: "cancel" },
-            { onSettled: () => setCancelId(null) },
+            { id: resumeId, action: "resume" },
+            { onSettled: () => setResumeId(null) },
           );
         }}
       />
     </>
   );
 }
+

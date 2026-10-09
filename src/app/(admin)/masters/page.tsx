@@ -19,7 +19,7 @@ export default function MastersHubPage() {
             <Link
               key={item.href}
               href={item.href}
-              className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 shadow-card transition-colors hover:border-primary/40 hover:bg-lightprimary"
+              className="flex items-center gap-3 rounded-2xl border border-border/70 bg-card p-4 shadow-sm transition-colors hover:border-primary/40 hover:bg-primary/5"
             >
               <span className="flex size-10 items-center justify-center rounded-lg bg-lightprimary text-primary">
                 <Icon className="size-5" />

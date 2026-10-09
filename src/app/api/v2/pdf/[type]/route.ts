@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
+import { loadActiveSessionUser } from "@/lib/auth-users";
+import { canAccessJob } from "@/lib/jobs/access";
+import { isBoth } from "@/lib/rbac";
+import { db } from "@/lib/db";
 import { buildSamplePdfData } from "@/lib/pdf/sample-data";
 import {
   PdfDataNotFoundError,
@@ -13,6 +17,28 @@ import { loadInspectionPdfData } from "@/lib/pdf/load-data";
 import { isStorageConfigured, uploadPdf } from "@/lib/services/files";
 
 const VALID_TYPES: VehiclePdfType[] = ["2w", "3w", "4w"];
+
+async function inspectionJobId(
+  type: VehiclePdfType,
+  inspectionId: number,
+): Promise<number | null> {
+  const row =
+    type === "2w"
+      ? await db.tbl_2wheeler.findUnique({
+          where: { id: inspectionId },
+          select: { job_id: true },
+        })
+      : type === "3w"
+        ? await db.tbl_3wheeler.findUnique({
+            where: { id: inspectionId },
+            select: { job_id: true },
+          })
+        : await db.tbl_4wheeler.findUnique({
+            where: { id: inspectionId },
+            select: { job_id: true },
+          });
+  return row?.job_id ?? null;
+}
 
 function parseId(raw: string | null): number | undefined {
   if (raw == null || raw.trim() === "") return undefined;
@@ -35,7 +61,11 @@ export async function GET(
   context: { params: Promise<{ type: string }> },
 ) {
   const session = await auth();
-  if (!session?.user) {
+  if (!session?.user?.id) {
+    return NextResponse.json({ authenticated: false }, { status: 401 });
+  }
+  const user = await loadActiveSessionUser(Number(session.user.id));
+  if (!user) {
     return NextResponse.json({ authenticated: false }, { status: 401 });
   }
 
@@ -74,6 +104,21 @@ export async function GET(
     let source: "sample" | "db" = "sample";
 
     if (!sample && (inspectionId != null || jobId != null)) {
+      const linkedJobId =
+        jobId ??
+        (inspectionId != null
+          ? await inspectionJobId(type, inspectionId)
+          : undefined);
+      if (linkedJobId == null) {
+        return NextResponse.json({ message: "Not found" }, { status: 404 });
+      }
+      const job = await db.tbl_jobs.findFirst({
+        where: { id: linkedJobId },
+        select: { agent_id: true, bank_id: true },
+      });
+      if (!job || !(await canAccessJob(user, job))) {
+        return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+      }
       const loaded = await loadInspectionPdfData({
         type,
         inspectionId,
@@ -83,6 +128,9 @@ export async function GET(
       resolvedTemplateId = loaded.templateId;
       source = "db";
     } else {
+      if (!isBoth(user)) {
+        return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+      }
       data = buildSamplePdfData(templateId);
     }
 

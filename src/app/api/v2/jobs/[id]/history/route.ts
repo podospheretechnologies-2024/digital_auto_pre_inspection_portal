@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 
 import { requireBothUser } from "@/lib/api";
+import { canAccessJob } from "@/lib/jobs/access";
 import { listJobHistory } from "@/lib/services/job-history";
+import { getJobById } from "@/lib/services/job-assignment";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -16,6 +18,14 @@ export async function GET(_request: Request, context: RouteContext) {
   const jobId = Number(idParam);
   if (!Number.isFinite(jobId) || jobId <= 0) {
     return NextResponse.json({ message: "Invalid job id" }, { status: 422 });
+  }
+
+  const job = await getJobById(jobId);
+  if (!job) {
+    return NextResponse.json({ message: "Not found" }, { status: 404 });
+  }
+  if (!(await canAccessJob(user, job))) {
+    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
   }
 
   try {

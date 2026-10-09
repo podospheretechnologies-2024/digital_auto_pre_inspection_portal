@@ -153,6 +153,7 @@ export const workflowActionSchema = z.object({
 /** Move a case back to an earlier workflow desk */
 export const changeStageSchema = z.object({
   stage: z.enum(["fresh", "assigned", "qc_pending"]),
+  reason: z.string().trim().min(1, "Reason is required").max(500),
 });
 
 export type JobListFilter = z.infer<typeof jobListFilterSchema>;

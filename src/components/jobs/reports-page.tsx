@@ -19,7 +19,9 @@ import {
   JobsTableHead,
   JobsTableHeader,
   JobsTableRow,
+  SheetPager,
   TableBody,
+  useSheetPage,
 } from "@/components/jobs/jobs-listing";
 import { JobsNav } from "@/components/jobs/jobs-nav";
 import { PageHeader } from "@/components/layout/page-header";
@@ -72,6 +74,7 @@ export function ReportsPage() {
   });
 
   const rows = listQuery.data ?? [];
+  const sheet = useSheetPage(rows);
 
   return (
     <>
@@ -86,7 +89,35 @@ export function ReportsPage() {
         className="mb-4"
         title="Search filters"
         description="Filter by customer, vehicle number, or DTI / bank ref"
-        toolbar={
+      >
+        <div className="flex flex-wrap items-end gap-3 px-4 py-3">
+          <div className="min-w-[10rem] flex-1 space-y-1.5">
+            <Label className="text-[11px] text-muted-foreground">Customer</Label>
+            <Input
+              value={customer}
+              onChange={(e) => setCustomer(e.target.value)}
+              placeholder="Name contains…"
+              className="h-9 rounded-lg bg-background text-[13px] shadow-none"
+            />
+          </div>
+          <div className="min-w-[10rem] flex-1 space-y-1.5">
+            <Label className="text-[11px] text-muted-foreground">
+              Vehicle no
+            </Label>
+            <Input
+              value={vehicleno}
+              onChange={(e) => setVehicleno(e.target.value)}
+              className="h-9 rounded-lg bg-background text-[13px] shadow-none"
+            />
+          </div>
+          <div className="min-w-[10rem] flex-1 space-y-1.5">
+            <Label className="text-[11px] text-muted-foreground">DTI / Ref</Label>
+            <Input
+              value={refNo}
+              onChange={(e) => setRefNo(e.target.value)}
+              className="h-9 rounded-lg bg-background text-[13px] shadow-none"
+            />
+          </div>
           <JobActionButton
             tone="primary"
             icon={Search}
@@ -99,36 +130,6 @@ export function ReportsPage() {
               })
             }
           />
-        }
-      >
-        <div className="flex flex-wrap items-end gap-3 px-4 py-3">
-          <div className="min-w-[10rem] flex-1 space-y-1.5">
-            <Label className="text-[11px] text-muted-foreground">Customer</Label>
-            <Input
-              value={customer}
-              onChange={(e) => setCustomer(e.target.value)}
-              placeholder="Name contains…"
-              className="h-8 text-[13px]"
-            />
-          </div>
-          <div className="min-w-[10rem] flex-1 space-y-1.5">
-            <Label className="text-[11px] text-muted-foreground">
-              Vehicle no
-            </Label>
-            <Input
-              value={vehicleno}
-              onChange={(e) => setVehicleno(e.target.value)}
-              className="h-8 text-[13px]"
-            />
-          </div>
-          <div className="min-w-[10rem] flex-1 space-y-1.5">
-            <Label className="text-[11px] text-muted-foreground">DTI / Ref</Label>
-            <Input
-              value={refNo}
-              onChange={(e) => setRefNo(e.target.value)}
-              className="h-8 text-[13px]"
-            />
-          </div>
         </div>
       </JobsListingCard>
 
@@ -143,6 +144,15 @@ export function ReportsPage() {
           listQuery.isError ? (listQuery.error as Error).message : null
         }
         empty="No matching reports"
+        footer={
+          rows.length > 0 ? (
+            <SheetPager
+              page={sheet.page}
+              pageCount={sheet.pageCount}
+              onPage={sheet.setPage}
+            />
+          ) : null
+        }
       >
         {rows.length > 0 ? (
           <JobsTable>
@@ -160,9 +170,9 @@ export function ReportsPage() {
               </JobsTableRow>
             </JobsTableHeader>
             <TableBody>
-              {rows.map((row, index) => (
+              {sheet.pageItems.map((row, index) => (
                 <JobsTableRow key={`${row.vehicle_type}-${row.id}`}>
-                  <JobSerialCell index={index} />
+                  <JobSerialCell index={sheet.start + index} />
                   <JobsTableCell>
                     <Badge variant="outline" className="font-normal">
                       {row.vehicle_type}
@@ -174,9 +184,9 @@ export function ReportsPage() {
                   <JobsTableCell className="font-medium">
                     {row.cname ?? "—"}
                   </JobsTableCell>
-                  <JobsTableCell>
-                    <RegPlate value={row.vehicleno} />
-                    <JobMetaLine>
+                  <JobsTableCell className="align-top">
+                    <RegPlate value={row.vehicleno} className="-mt-0.5" />
+                    <JobMetaLine full>
                       {[row.company, row.model].filter(Boolean).join(" / ")}
                     </JobMetaLine>
                   </JobsTableCell>
@@ -199,14 +209,14 @@ export function ReportsPage() {
                             row.vehicle_type,
                             { mode: "view" },
                           )}
-                          tone="info"
+                          tone="view"
                           icon={Eye}
                           label="View"
                         />
                       ) : null}
                       <JobActionLink
                         href={pdfPathForInspection(row.vehicle_type, row.id)}
-                        tone="primary"
+                        tone="pdf"
                         icon={FileText}
                         label="PDF"
                       />

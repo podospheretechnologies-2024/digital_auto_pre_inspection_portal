@@ -2,10 +2,11 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Card,
   CardContent,
@@ -74,6 +75,7 @@ export function AccountSettingsPage() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [confirmProfile, setConfirmProfile] = useState(false);
 
   const profileQuery = useQuery({
     queryKey: ["account-settings"],
@@ -162,7 +164,7 @@ export function AccountSettingsPage() {
       />
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
+        <Card className="rounded-2xl border-border/70 shadow-sm">
           <CardHeader>
             <CardTitle>Profile</CardTitle>
             <CardDescription>
@@ -242,7 +244,7 @@ export function AccountSettingsPage() {
                     !lastName.trim() ||
                     profileMutation.isPending
                   }
-                  onClick={() => profileMutation.mutate()}
+                  onClick={() => setConfirmProfile(true)}
                 >
                   {profileMutation.isPending ? "Saving…" : "Save profile"}
                 </Button>
@@ -252,7 +254,7 @@ export function AccountSettingsPage() {
         </Card>
 
         <div className="space-y-4">
-          <Card>
+          <Card className="rounded-2xl border-border/70 shadow-sm">
             <CardHeader>
               <CardTitle>Change email</CardTitle>
               <CardDescription>
@@ -292,7 +294,7 @@ export function AccountSettingsPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="rounded-2xl border-border/70 shadow-sm">
             <CardHeader>
               <CardTitle>Change password</CardTitle>
               <CardDescription>
@@ -345,6 +347,20 @@ export function AccountSettingsPage() {
           </Card>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmProfile}
+        onOpenChange={setConfirmProfile}
+        title="Save profile?"
+        description="Your profile will be saved after you confirm."
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
+        loading={profileMutation.isPending}
+        onConfirm={() => {
+          setConfirmProfile(false);
+          profileMutation.mutate();
+        }}
+      />
     </>
   );
 }

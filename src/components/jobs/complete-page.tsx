@@ -21,7 +21,11 @@ import {
   JobsTableHead,
   JobsTableHeader,
   JobsTableRow,
+  SheetDateTime,
+  SheetPager,
+  SheetPerson,
   TableBody,
+  useSheetPage,
 } from "@/components/jobs/jobs-listing";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -34,7 +38,6 @@ import {
 import {
   inspectPathForJob,
   pdfPathForInspection,
-  formatDeskDate,
   type WheelKind,
 } from "@/lib/jobs/helpers";
 
@@ -59,6 +62,7 @@ type QcRow = {
   job_created_at?: string | null;
   assigned_at?: string | null;
   qc_datetime?: string | null;
+  stage_reason?: string | null;
 };
 
 export function CompleteCasesPage() {
@@ -68,7 +72,9 @@ export function CompleteCasesPage() {
   const listQuery = useQuery({
     queryKey: ["jobs-complete"],
     queryFn: async () => {
-      const res = await fetch(`/api/v2/jobs/qc?done=1&vehicle_type=all`);
+      const res = await fetch(`/api/v2/jobs/qc?done=1&vehicle_type=all`, {
+        cache: "no-store",
+      });
       const json = await res.json();
       if (!res.ok) throw new Error(json.message || "Failed");
       return (json.data ?? []) as QcRow[];
@@ -88,6 +94,7 @@ export function CompleteCasesPage() {
     () => filterCaseRows(allRows, filters, "qc"),
     [allRows, filters],
   );
+  const sheet = useSheetPage(rows);
 
   return (
     <>
@@ -102,6 +109,7 @@ export function CompleteCasesPage() {
         description="QC approved cases — view details or download the PDF report"
         count={rows.length}
         totalCount={allRows.length}
+        mark="complete"
         loading={listQuery.isLoading}
         error={
           listQuery.isError ? (listQuery.error as Error).message : null
@@ -119,6 +127,15 @@ export function CompleteCasesPage() {
             surveyors={surveyors}
           />
         }
+        footer={
+          rows.length > 0 ? (
+            <SheetPager
+              page={sheet.page}
+              pageCount={sheet.pageCount}
+              onPage={sheet.setPage}
+            />
+          ) : null
+        }
       >
         {rows.length > 0 ? (
           <JobsTable>
@@ -133,13 +150,14 @@ export function CompleteCasesPage() {
                 <JobsTableHead>Ownership</JobsTableHead>
                 <JobsTableHead>Agent</JobsTableHead>
                 <JobsTableHead>Date</JobsTableHead>
+                <JobsTableHead>Reason</JobsTableHead>
                 <JobsTableHead className="text-right">Actions</JobsTableHead>
               </JobsTableRow>
             </JobsTableHeader>
             <TableBody>
-              {rows.map((row, index) => (
+              {sheet.pageItems.map((row, index) => (
                 <JobsTableRow key={`${row.vehicle_type}-${row.id}`}>
-                  <JobSerialCell index={index} />
+                  <JobSerialCell index={sheet.start + index} />
                   <JobsTableCell>
                     <Badge variant="outline" className="font-normal">
                       {row.vehicle_type}
@@ -148,12 +166,12 @@ export function CompleteCasesPage() {
                   <JobsTableCell>
                     <JobDtiCell value={row.dti_no} />
                   </JobsTableCell>
-                  <JobsTableCell className="font-medium">
-                    {row.cname ?? "—"}
-                  </JobsTableCell>
                   <JobsTableCell>
-                    <RegPlate value={row.vehicleno} />
-                    <JobMetaLine>
+                    <SheetPerson name={row.cname} phone={row.mobileno} />
+                  </JobsTableCell>
+                  <JobsTableCell className="align-top">
+                    <RegPlate value={row.vehicleno} className="-mt-0.5" />
+                    <JobMetaLine full>
                       {[row.company, row.model, row.bankname]
                         .filter(Boolean)
                         .join(" · ")}
@@ -161,9 +179,19 @@ export function CompleteCasesPage() {
                   </JobsTableCell>
                   <JobsTableCell>{row.valuation_price ?? "—"}</JobsTableCell>
                   <JobsTableCell>{row.ownership_name ?? "—"}</JobsTableCell>
-                  <JobsTableCell>{row.agent_name}</JobsTableCell>
-                  <JobsTableCell className="tabular-nums text-muted-foreground">
-                    {formatDeskDate(row.qc_datetime ?? row.created_at)}
+                  <JobsTableCell>
+                    <SheetPerson name={row.agent_name} />
+                  </JobsTableCell>
+                  <JobsTableCell>
+                    <SheetDateTime value={row.qc_datetime ?? row.created_at} />
+                  </JobsTableCell>
+                  <JobsTableCell>
+                    <div
+                      className="max-w-[12rem] truncate text-[12px]"
+                      title={row.stage_reason ?? undefined}
+                    >
+                      {row.stage_reason || "—"}
+                    </div>
                   </JobsTableCell>
                   <JobsTableCell>
                     <JobActions>
@@ -186,14 +214,14 @@ export function CompleteCasesPage() {
                             row.vehicle_type,
                             { mode: "view" },
                           )}
-                          tone="info"
+                          tone="view"
                           icon={Eye}
                           label="View"
                         />
                       ) : null}
                       <JobActionLink
                         href={pdfPathForInspection(row.vehicle_type, row.id)}
-                        tone="primary"
+                        tone="pdf"
                         icon={FileText}
                         label="PDF"
                       />

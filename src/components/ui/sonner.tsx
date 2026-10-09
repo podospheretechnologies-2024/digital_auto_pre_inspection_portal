@@ -11,9 +11,9 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       position="top-center"
       theme={theme as ToasterProps["theme"]}
-      className="toaster group"
+      className="toaster group !top-1/2 !-translate-y-1/2"
       richColors
-      closeButton
+      closeButton={false}
       icons={{
         success: (
           <CircleCheckIcon className="size-4" />

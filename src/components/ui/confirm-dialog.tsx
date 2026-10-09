@@ -62,7 +62,7 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel = "Confirm",
-  cancelLabel = "Keep",
+  cancelLabel = "Cancel",
   tone = "default",
   loading = false,
   onConfirm,

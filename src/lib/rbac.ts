@@ -1,5 +1,30 @@
 import type { SessionUser, UserType } from "@/types/next-auth";
 
+import { surveyorPermissionCeiling } from "@/lib/account/permissions-policy";
+
+export type AppRole = "admin" | "HO" | "RO" | "Surveyor" | "Bank";
+
+const KNOWN_TYPES = new Set<UserType>(["", "HO", "RO", "Surveyor", "Bank"]);
+
+export function roleFromSession(user: {
+  type?: string | null;
+  isAdmin?: boolean;
+} | null | undefined): AppRole | null {
+  if (!user) return null;
+  if (user.isAdmin && (user.type === "" || user.type == null)) return "admin";
+  if (user.type === "HO" || user.type === "RO" || user.type === "Surveyor" || user.type === "Bank") {
+    return user.type;
+  }
+  return null;
+}
+
+export function isKnownRole(user: {
+  type?: string | null;
+  isAdmin?: boolean;
+} | null | undefined): boolean {
+  return roleFromSession(user) != null && KNOWN_TYPES.has((user?.type ?? "") as UserType);
+}
+
 function normalizeType(type: string | null | undefined): UserType {
   if (!type) return "";
   if (type === "HO" || type === "RO" || type === "Surveyor" || type === "Bank")
@@ -45,7 +70,8 @@ export function isBoth(user: SessionUser | null | undefined): boolean {
 export function isAll(user: SessionUser | null | undefined): boolean {
   return (
     !!user &&
-    (user.type === "" ||
+    isKnownRole(user) &&
+    (isAdmin(user) ||
       user.type === "HO" ||
       user.type === "RO" ||
       user.type === "Surveyor")
@@ -71,9 +97,11 @@ export function hasPermission(
   user: SessionUser | null | undefined,
   permission: string,
 ): boolean {
-  if (!user) return false;
-  // Admin + HO have full Manage access; RO/Surveyor use granted menu codes.
+  if (!user || !isKnownRole(user)) return false;
   if (isBoth(user)) return true;
+  if (user.type === "Surveyor" && !surveyorPermissionCeiling().has(permission)) {
+    return false;
+  }
   return user.permissions.includes(permission);
 }
 

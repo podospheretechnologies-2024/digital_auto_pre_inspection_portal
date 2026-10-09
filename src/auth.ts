@@ -1,10 +1,21 @@
+import { CredentialsSignin } from "next-auth";
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { z } from "zod";
 
 import { authConfig } from "@/auth.config";
+import {
+  clearLoginFailures,
+  loginBlocked,
+  recordLoginFailure,
+} from "@/lib/auth/login-rate-limit";
 import { authenticateUser } from "@/lib/auth-users";
+import { isKnownRole } from "@/lib/rbac";
 import type { UserType } from "@/types/next-auth";
+
+class LoginRateLimitError extends CredentialsSignin {
+  code = "rate_limit";
+}
 
 const credentialsSchema = z.object({
   email: z.string().email(),
@@ -27,18 +38,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
+        const email = parsed.data.email;
+        if (loginBlocked(email)) {
+          throw new LoginRateLimitError();
+        }
+
         if (!process.env.DATABASE_URL) {
           throw new Error("DATABASE_URL is not configured");
         }
 
-        const user = await authenticateUser(
-          parsed.data.email,
-          parsed.data.password,
-        );
+        const user = await authenticateUser(email, parsed.data.password);
 
-        if (!user) {
+        if (!user || !isKnownRole(user)) {
+          recordLoginFailure(email);
           return null;
         }
+
+        clearLoginFailures(email);
 
         return {
           id: user.id,

@@ -4,9 +4,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { toast as notice } from "@/lib/toast";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   CrudActionButton,
   CrudActionGroup,
@@ -86,6 +88,11 @@ export function BankUsersPage() {
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [confirmSave, setConfirmSave] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
 
   const listQuery = useQuery({
     queryKey: ["account-bank-users"],
@@ -153,7 +160,7 @@ export function BankUsersPage() {
       });
     },
     onSuccess: async () => {
-      toast.success(editingId ? "Bank user updated" : "Bank user created");
+      notice.success(editingId ? "Bank user updated" : "Bank user created");
       setOpen(false);
       setEditingId(null);
       setForm(emptyForm);
@@ -171,7 +178,7 @@ export function BankUsersPage() {
         body: JSON.stringify({ id }),
       }),
     onSuccess: async () => {
-      toast.success("Bank user deleted");
+      notice.success("Bank user deleted");
       await queryClient.invalidateQueries({
         queryKey: ["account-bank-users"],
       });
@@ -200,7 +207,7 @@ export function BankUsersPage() {
         actions={<Button onClick={openCreate}>Add bank user</Button>}
       />
 
-      <Card>
+      <Card className="overflow-hidden rounded-2xl border-border/70 shadow-sm">
         <CardHeader>
           <CardTitle>Users</CardTitle>
           <CardDescription>
@@ -251,15 +258,12 @@ export function BankUsersPage() {
                           icon={Trash2}
                           label="Delete"
                           disabled={deleteMutation.isPending}
-                          onClick={() => {
-                            if (
-                              window.confirm(
-                                `Delete ${row.first_name} ${row.last_name}?`,
-                              )
-                            ) {
-                              deleteMutation.mutate(row.id);
-                            }
-                          }}
+                          onClick={() =>
+                            setDeleteTarget({
+                              id: row.id,
+                              name: `${row.first_name} ${row.last_name}`,
+                            })
+                          }
                         />
                       </CrudActionGroup>
                     </TableCell>
@@ -384,13 +388,50 @@ export function BankUsersPage() {
             </Button>
             <Button
               disabled={!canSubmit}
-              onClick={() => saveMutation.mutate()}
+              onClick={() => setConfirmSave(true)}
             >
               {saveMutation.isPending ? "Saving…" : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={confirmSave}
+        onOpenChange={setConfirmSave}
+        title={editingId ? "Save these changes?" : "Save this bank user?"}
+        description="The record will be saved after you confirm."
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
+        loading={saveMutation.isPending}
+        onConfirm={() => {
+          setConfirmSave(false);
+          saveMutation.mutate();
+        }}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget != null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        tone="danger"
+        title="Delete bank user?"
+        description={
+          deleteTarget
+            ? `“${deleteTarget.name}” will be removed. This cannot be undone.`
+            : undefined
+        }
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
+        loading={deleteMutation.isPending}
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          deleteMutation.mutate(deleteTarget.id, {
+            onSettled: () => setDeleteTarget(null),
+          });
+        }}
+      />
     </>
   );
 }

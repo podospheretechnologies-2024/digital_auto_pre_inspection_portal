@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { toast as notice } from "@/lib/toast";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -63,6 +64,7 @@ export function ModelsMasterPage() {
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [name, setName] = useState("");
+  const [confirmSave, setConfirmSave] = useState(false);
   const [companyId, setCompanyId] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{
     id: number;
@@ -100,7 +102,7 @@ export function ModelsMasterPage() {
       });
     },
     onSuccess: async () => {
-      toast.success(editingId ? "Model updated" : "Model created");
+      notice.success(editingId ? "Model updated" : "Model created");
       setOpen(false);
       await queryClient.invalidateQueries({ queryKey: ["masters-models"] });
     },
@@ -114,7 +116,7 @@ export function ModelsMasterPage() {
         body: JSON.stringify({ id }),
       }),
     onSuccess: async () => {
-      toast.success("Model deleted");
+      notice.success("Model deleted");
       await queryClient.invalidateQueries({ queryKey: ["masters-models"] });
     },
     onError: (error: Error) => toast.error(error.message),
@@ -139,7 +141,7 @@ export function ModelsMasterPage() {
         }
       />
 
-      <Card>
+      <Card className="overflow-hidden rounded-2xl border-border/70 shadow-sm">
         <CardHeader>
           <CardTitle>Model list</CardTitle>
           <CardDescription>Company → Model hierarchy</CardDescription>
@@ -233,13 +235,27 @@ export function ModelsMasterPage() {
             </Button>
             <Button
               disabled={!name.trim() || !companyId || saveMutation.isPending}
-              onClick={() => saveMutation.mutate()}
+              onClick={() => setConfirmSave(true)}
             >
               {saveMutation.isPending ? "Saving…" : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={confirmSave}
+        onOpenChange={setConfirmSave}
+        title={editingId ? "Save this model?" : "Save new model?"}
+        description="The record will be saved after you confirm."
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
+        loading={saveMutation.isPending}
+        onConfirm={() => {
+          setConfirmSave(false);
+          saveMutation.mutate();
+        }}
+      />
 
       <ConfirmDialog
         open={deleteTarget != null}
@@ -253,7 +269,8 @@ export function ModelsMasterPage() {
             ? `“${deleteTarget.name}” will be removed. This cannot be undone.`
             : undefined
         }
-        confirmLabel="Delete"
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
         loading={deleteMutation.isPending}
         onConfirm={() => {
           if (!deleteTarget) return;

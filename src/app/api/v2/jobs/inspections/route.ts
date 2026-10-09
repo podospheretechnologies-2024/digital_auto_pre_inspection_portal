@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 
-import { requireAllUser, zodErrorResponse } from "@/lib/api";
+import { denyUnlessButtonPermission, denyUnlessPagePermission, requireAllUser, zodErrorResponse } from "@/lib/api";
+import { db } from "@/lib/db";
+import { canAccessJob, canWorkInspection } from "@/lib/jobs/access";
+import { isBoth } from "@/lib/rbac";
 import { resolveWheelKind } from "@/lib/jobs/helpers";
 import { inspectionCoreSchema } from "@/lib/jobs/schemas";
 import {
@@ -13,6 +16,13 @@ import { listInspectionPhotos } from "@/lib/services/inspection-media";
 import { getJobById } from "@/lib/services/job-assignment";
 import { resolveMediaUrl } from "@/lib/services/files";
 
+async function jobRef(jobId: number) {
+  return db.tbl_jobs.findFirst({
+    where: { id: jobId },
+    select: { agent_id: true, bank_id: true, is_deleted: true, on_hold: true },
+  });
+}
+
 /**
  * GET /api/v2/jobs/inspections?job_id=&type=2wheeler|3wheeler|4wheeler
  *   or ?id=&type=
@@ -22,6 +32,8 @@ import { resolveMediaUrl } from "@/lib/services/files";
 export async function GET(request: Request) {
   const user = await requireAllUser();
   if (user instanceof NextResponse) return user;
+  const denied = denyUnlessPagePermission(user, "inspect_view");
+  if (denied) return denied;
 
   const url = new URL(request.url);
   const jobId = Number(url.searchParams.get("job_id"));
@@ -34,6 +46,11 @@ export async function GET(request: Request) {
       const data = await getInspectionById(inspId, kind);
       if (!data) {
         return NextResponse.json({ message: "Not found" }, { status: 404 });
+      }
+      const jobId = (data as { job_id?: number | null }).job_id;
+      const job = jobId ? await jobRef(jobId) : null;
+      if (!job || !(await canAccessJob(user, job))) {
+        return NextResponse.json({ message: "Forbidden" }, { status: 403 });
       }
       const photos = await listInspectionPhotos(kind, inspId);
       return NextResponse.json({
@@ -59,6 +76,9 @@ export async function GET(request: Request) {
       const job = await getJobById(jobId);
       if (!job) {
         return NextResponse.json({ message: "Job not found" }, { status: 404 });
+      }
+      if (!(await canAccessJob(user, job))) {
+        return NextResponse.json({ message: "Forbidden" }, { status: 403 });
       }
       const kind = typeParam
         ? resolveWheelKind(typeParam)
@@ -101,6 +121,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const user = await requireAllUser();
   if (user instanceof NextResponse) return user;
+  const denied = denyUnlessButtonPermission(user, "inspect_edit");
+  if (denied) return denied;
 
   const body = await request.json();
   const type = body.vehicle_type ?? body.type ?? "4wheeler";
@@ -108,6 +130,19 @@ export async function POST(request: Request) {
   if (!parsed.success) return zodErrorResponse(parsed.error);
 
   try {
+    const job = await jobRef(parsed.data.job_id);
+    if (!job || !(await canWorkInspection(user, job))) {
+      return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+    }
+    if (job.on_hold === 1) {
+      return NextResponse.json(
+        { message: "That stage change is not allowed from here" },
+        { status: 422 },
+      );
+    }
+    if (parsed.data.skip_qc && !isBoth(user)) {
+      return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+    }
     const existing = await getInspectionByJobId(parsed.data.job_id, type);
     if (existing) {
       return NextResponse.json(
@@ -126,6 +161,8 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   const user = await requireAllUser();
   if (user instanceof NextResponse) return user;
+  const denied = denyUnlessButtonPermission(user, "inspect_edit");
+  if (denied) return denied;
 
   const body = await request.json();
   const inspectionId = Number(body.inspection_id ?? body.id);
@@ -142,6 +179,33 @@ export async function PUT(request: Request) {
 
   try {
     const kind = resolveWheelKind(String(type));
+    const existing = await getInspectionById(inspectionId, kind);
+    const existingJobId = (existing as { job_id?: number | null } | null)?.job_id;
+    if (!existing || !existingJobId) {
+      return NextResponse.json({ message: "Not found" }, { status: 404 });
+    }
+    const job = await jobRef(existingJobId);
+    if (!job || !(await canWorkInspection(user, job))) {
+      return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+    }
+    if (job.on_hold === 1) {
+      return NextResponse.json(
+        { message: "That stage change is not allowed from here" },
+        { status: 422 },
+      );
+    }
+    if (Number((existing as { qc?: number | null }).qc ?? 0) === 1 && !isBoth(user)) {
+      return NextResponse.json(
+        { message: "Completed inspection cannot be edited" },
+        { status: 422 },
+      );
+    }
+    if (parsed.data.skip_qc && !isBoth(user)) {
+      return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+    }
+    if (parsed.data.job_id !== existingJobId) {
+      return NextResponse.json({ message: "Invalid job id" }, { status: 422 });
+    }
     const data = await updateInspection(
       user,
       kind,

@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { toast as notice } from "@/lib/toast";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -77,6 +78,7 @@ export function NameOnlyMasterPage({
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<NameRow | null>(null);
   const [name, setName] = useState("");
+  const [confirmSave, setConfirmSave] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<NameRow | null>(null);
 
   const listQuery = useQuery({
@@ -101,7 +103,7 @@ export function NameOnlyMasterPage({
       });
     },
     onSuccess: async () => {
-      toast.success(editing ? "Updated" : "Created");
+      notice.success(editing ? "Updated" : "Created");
       setOpen(false);
       setEditing(null);
       setName("");
@@ -117,7 +119,7 @@ export function NameOnlyMasterPage({
         body: JSON.stringify({ id }),
       }),
     onSuccess: async () => {
-      toast.success("Deleted");
+      notice.success("Deleted");
       await queryClient.invalidateQueries({ queryKey: [queryKey] });
     },
     onError: (error: Error) => toast.error(error.message),
@@ -143,7 +145,7 @@ export function NameOnlyMasterPage({
         actions={<Button onClick={openCreate}>Add {itemLabel}</Button>}
       />
 
-      <Card>
+      <Card className="overflow-hidden rounded-2xl border-border/70 shadow-sm">
         <CardHeader>
           <CardTitle>{title} list</CardTitle>
           <CardDescription>
@@ -217,13 +219,27 @@ export function NameOnlyMasterPage({
             </Button>
             <Button
               disabled={!name.trim() || saveMutation.isPending}
-              onClick={() => saveMutation.mutate()}
+              onClick={() => setConfirmSave(true)}
             >
               {saveMutation.isPending ? "Saving…" : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={confirmSave}
+        onOpenChange={setConfirmSave}
+        title={editing ? `Save this ${itemLabel.toLowerCase()}?` : `Save new ${itemLabel.toLowerCase()}?`}
+        description="The record will be saved after you confirm."
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
+        loading={saveMutation.isPending}
+        onConfirm={() => {
+          setConfirmSave(false);
+          saveMutation.mutate();
+        }}
+      />
 
       <ConfirmDialog
         open={deleteTarget != null}
@@ -237,7 +253,8 @@ export function NameOnlyMasterPage({
             ? `“${deleteTarget.name}” will be removed. This cannot be undone.`
             : undefined
         }
-        confirmLabel="Delete"
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
         loading={deleteMutation.isPending}
         onConfirm={() => {
           if (!deleteTarget) return;

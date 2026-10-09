@@ -3,11 +3,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CirclePause, ClipboardCheck } from "lucide-react";
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 
 import { RegPlate } from "@/components/atlas/reg-plate";
 import { CaseListToolbar } from "@/components/jobs/case-list-toolbar";
 import { ChangeStageButton } from "@/components/jobs/change-stage-button";
+import { refreshJobSheets } from "@/lib/jobs/refresh-sheets";
 import { JobHistoryButton } from "@/components/jobs/job-history-button";
 import {
   JobActionButton,
@@ -23,7 +24,11 @@ import {
   JobsTableHead,
   JobsTableHeader,
   JobsTableRow,
+  SheetDateTime,
+  SheetPager,
+  SheetPerson,
   TableBody,
+  useSheetPage,
 } from "@/components/jobs/jobs-listing";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -47,7 +52,6 @@ import {
 } from "@/lib/jobs/case-list-filters";
 import {
   inspectPathForJob,
-  formatDeskDate,
   type WheelKind,
 } from "@/lib/jobs/helpers";
 
@@ -72,6 +76,7 @@ type QcRow = {
   job_created_at?: string | null;
   assigned_at?: string | null;
   qc_datetime?: string | null;
+  stage_reason?: string | null;
 };
 
 async function apiJson<T>(url: string, init?: RequestInit): Promise<T> {
@@ -92,6 +97,7 @@ export function QcJobsPage() {
   const [filters, setFilters] = useState<CaseListFilterState>(EMPTY_CASE_FILTERS);
   const [active, setActive] = useState<QcRow | null>(null);
   const [holdJobId, setHoldJobId] = useState<number | null>(null);
+  const [confirmSubmit, setConfirmSubmit] = useState(false);
   const [form, setForm] = useState({
     remarks: "",
     valuation_price: "",
@@ -103,6 +109,7 @@ export function QcJobsPage() {
     queryFn: async () => {
       const json = await apiJson<{ data: QcRow[] }>(
         `/api/v2/jobs/qc?vehicle_type=all`,
+        { cache: "no-store" },
       );
       return json.data;
     },
@@ -122,10 +129,10 @@ export function QcJobsPage() {
         }),
       });
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("QC submitted");
       setActive(null);
-      void queryClient.invalidateQueries({ queryKey: ["jobs-qc"] });
+      await refreshJobSheets(queryClient);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -142,8 +149,7 @@ export function QcJobsPage() {
       setActive((current) =>
         current?.job_id === jobId ? null : current,
       );
-      await queryClient.invalidateQueries({ queryKey: ["jobs-qc"] });
-      await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      await refreshJobSheets(queryClient);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -161,6 +167,7 @@ export function QcJobsPage() {
     () => filterCaseRows(allRows, filters, "created"),
     [allRows, filters],
   );
+  const sheet = useSheetPage(rows);
 
   return (
     <>
@@ -177,6 +184,7 @@ export function QcJobsPage() {
         description="Inspections waiting for quality check"
         count={rows.length}
         totalCount={allRows.length}
+        mark="qc"
         loading={listQuery.isLoading}
         error={
           listQuery.isError ? (listQuery.error as Error).message : null
@@ -194,6 +202,15 @@ export function QcJobsPage() {
             surveyors={surveyors}
           />
         }
+        footer={
+          rows.length > 0 ? (
+            <SheetPager
+              page={sheet.page}
+              pageCount={sheet.pageCount}
+              onPage={sheet.setPage}
+            />
+          ) : null
+        }
       >
         {rows.length > 0 ? (
           <JobsTable>
@@ -206,13 +223,14 @@ export function QcJobsPage() {
                 <JobsTableHead>Vehicle</JobsTableHead>
                 <JobsTableHead>Agent</JobsTableHead>
                 <JobsTableHead>Date</JobsTableHead>
+                <JobsTableHead>Reason</JobsTableHead>
                 <JobsTableHead className="text-right">Actions</JobsTableHead>
               </JobsTableRow>
             </JobsTableHeader>
             <TableBody>
-              {rows.map((row, index) => (
+              {sheet.pageItems.map((row, index) => (
                 <JobsTableRow key={`${row.vehicle_type}-${row.id}`}>
-                  <JobSerialCell index={index} />
+                  <JobSerialCell index={sheet.start + index} />
                   <JobsTableCell>
                     <Badge variant="outline" className="font-normal">
                       {row.vehicle_type}
@@ -221,20 +239,30 @@ export function QcJobsPage() {
                   <JobsTableCell>
                     <JobDtiCell value={row.dti_no} />
                   </JobsTableCell>
-                  <JobsTableCell className="font-medium">
-                    {row.cname ?? "—"}
-                  </JobsTableCell>
                   <JobsTableCell>
-                    <RegPlate value={row.vehicleno} />
-                    <JobMetaLine>
+                    <SheetPerson name={row.cname} phone={row.mobileno} />
+                  </JobsTableCell>
+                  <JobsTableCell className="align-top">
+                    <RegPlate value={row.vehicleno} className="-mt-0.5" />
+                    <JobMetaLine full>
                       {[row.company, row.model, row.bankname]
                         .filter(Boolean)
                         .join(" · ")}
                     </JobMetaLine>
                   </JobsTableCell>
-                  <JobsTableCell>{row.agent_name}</JobsTableCell>
-                  <JobsTableCell className="tabular-nums text-muted-foreground">
-                    {formatDeskDate(row.created_at)}
+                  <JobsTableCell>
+                    <SheetPerson name={row.agent_name} />
+                  </JobsTableCell>
+                  <JobsTableCell>
+                    <SheetDateTime value={row.created_at} />
+                  </JobsTableCell>
+                  <JobsTableCell>
+                    <div
+                      className="max-w-[12rem] truncate text-[12px]"
+                      title={row.stage_reason ?? undefined}
+                    >
+                      {row.stage_reason || "—"}
+                    </div>
                   </JobsTableCell>
                   <JobsTableCell>
                     <JobActions>
@@ -303,7 +331,7 @@ export function QcJobsPage() {
       </JobsListingCard>
 
       {active ? (
-        <Card className="overflow-hidden border-border/70">
+        <Card className="overflow-hidden rounded-2xl border-border/70 shadow-sm">
           <CardHeader className="border-b border-border/70 bg-muted/20 px-4 py-3">
             <CardTitle className="text-[15px]">
               Submit QC — {active.vehicle_type} #{active.id}
@@ -345,7 +373,7 @@ export function QcJobsPage() {
               <Button
                 className="h-9 shadow-none"
                 disabled={submitMutation.isPending}
-                onClick={() => submitMutation.mutate()}
+                onClick={() => setConfirmSubmit(true)}
               >
                 {submitMutation.isPending ? "Saving…" : "Approve QC"}
               </Button>
@@ -360,6 +388,20 @@ export function QcJobsPage() {
           </CardContent>
         </Card>
       ) : null}
+
+      <ConfirmDialog
+        open={confirmSubmit}
+        onOpenChange={setConfirmSubmit}
+        title="Submit this quality check?"
+        description="The case will be marked complete after you confirm."
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
+        loading={submitMutation.isPending}
+        onConfirm={() => {
+          setConfirmSubmit(false);
+          submitMutation.mutate();
+        }}
+      />
 
       <ConfirmDialog
         open={holdJobId != null}

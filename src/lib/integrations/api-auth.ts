@@ -2,6 +2,8 @@
  * External API auth helpers mirroring Laravel RestAPI / vehicle-rc checks.
  */
 
+import { timingSafeEqual } from "node:crypto";
+
 import { db } from "@/lib/db";
 
 export type ApiUser = {

@@ -11,27 +11,16 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 
-import { RegPlate } from "@/components/atlas/reg-plate";
-import { jobStatusPill, StatusPill } from "@/components/atlas/status-pill";
 import { WaitingBars } from "@/components/atlas/waiting-bars";
+import { CaseAnalyticsChart } from "@/components/dashboard/case-analytics-chart";
 import {
   Card,
-  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { LinkButton } from "@/components/ui/link-button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { inspectPathForJob } from "@/lib/jobs/helpers";
+import type { DashboardAnalytics } from "@/lib/jobs/dashboard-analytics";
 import { cn } from "@/lib/utils";
 
 export type DashboardCounts = {
@@ -39,16 +28,6 @@ export type DashboardCounts = {
   schedule: number;
   qc: number;
   complete: number;
-};
-
-export type RecentCase = {
-  id: number;
-  vehicleno: string;
-  vehicle_type: string | null;
-  cname: string | null;
-  bank: string | null;
-  status: string;
-  cdate: Date;
 };
 
 // Pages that are not in the sidebar, so they stay one click away.
@@ -63,7 +42,6 @@ function initials(name: string) {
   return name.trim().slice(0, 2).toUpperCase() || "DA";
 }
 
-/** The template's coloured top card: soft tint, icon, label and figure, all centred. */
 function TopCard({
   label,
   value,
@@ -83,22 +61,35 @@ function TopCard({
     <Link
       href={href}
       className={cn(
-        "rounded-lg p-6 text-center transition-transform duration-200 ease-in-out hover:scale-[1.03]",
+        "group flex items-center gap-4 rounded-2xl p-5 shadow-sm ring-1 ring-black/5 transition duration-200 hover:-translate-y-0.5 hover:shadow-md",
         tint,
       )}
     >
       <span
         className={cn(
-          "mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-background/70",
+          "flex size-12 shrink-0 items-center justify-center rounded-2xl bg-white/80 shadow-sm",
           ink,
         )}
       >
         <Icon className="size-6" />
       </span>
-      <p className={cn("mb-1 font-semibold", ink)}>{label}</p>
-      <p className={cn("text-2xl font-semibold tabular-nums", ink)}>
-        {value.toLocaleString()}
-      </p>
+      <span className="min-w-0 text-left">
+        <span className={cn("block text-[13px] font-medium", ink)}>{label}</span>
+        <span
+          className={cn(
+            "mt-1 block text-3xl font-semibold tabular-nums leading-none tracking-tight",
+            ink,
+          )}
+        >
+          {value.toLocaleString()}
+        </span>
+      </span>
+      <ArrowUpRight
+        className={cn(
+          "ml-auto size-4 shrink-0 opacity-40 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:opacity-100",
+          ink,
+        )}
+      />
     </Link>
   );
 }
@@ -108,29 +99,30 @@ export function DashboardView({
   signedInAs,
   counts,
   countsError,
-  recent,
-  showRoleNote,
+  analytics,
 }: {
   firstName: string;
   signedInAs: string;
   counts: DashboardCounts;
   countsError: string | null;
-  recent: RecentCase[];
-  showRoleNote: boolean;
+  analytics: DashboardAnalytics;
 }) {
   return (
     <div className="grid grid-cols-12 gap-6">
       {/* Welcome */}
-      <div className="relative col-span-12 flex items-center justify-between overflow-hidden rounded-lg bg-lightsecondary p-6">
-        <div className="flex items-center gap-3">
-          <span className="flex size-[50px] shrink-0 items-center justify-center rounded-full bg-primary text-base font-semibold text-primary-foreground">
+      <div className="relative col-span-12 flex items-center justify-between overflow-hidden rounded-2xl bg-gradient-to-r from-[#e7f0ff] via-[#f5f8ff] to-[#e8f7ff] p-6 shadow-sm ring-1 ring-sky-100">
+        <div className="flex items-center gap-4">
+          <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-primary text-lg font-semibold text-primary-foreground shadow-md shadow-primary/25">
             {initials(firstName)}
           </span>
           <div className="flex flex-col gap-0.5">
-            <h1 className="text-lg font-semibold">
+            <p className="text-[11px] font-semibold tracking-[0.16em] text-primary uppercase">
+              Pre-Inspection
+            </p>
+            <h1 className="text-xl font-semibold tracking-tight">
               Welcome back! {firstName} 👋
             </h1>
-            <p className="text-muted-foreground">{signedInAs}</p>
+            <p className="text-sm text-muted-foreground">{signedInAs}</p>
           </div>
         </div>
         <div className="pointer-events-none absolute right-8 bottom-0 hidden sm:block">
@@ -147,7 +139,6 @@ export function DashboardView({
         <p className="col-span-12 text-sm text-destructive">{countsError}</p>
       ) : null}
 
-      {/* Top cards */}
       <div className="col-span-12 grid grid-cols-2 gap-6 lg:grid-cols-4">
         <TopCard
           label="Fresh cases"
@@ -182,92 +173,14 @@ export function DashboardView({
           ink="text-ok"
         />
       </div>
-      {showRoleNote ? (
-        <p className="col-span-12 -mt-3 text-xs text-muted-foreground">
-          Counts cover all jobs. Your list pages may still filter by role.
-        </p>
-      ) : null}
 
-      {/* Recent cases */}
-      <Card className="col-span-12 lg:col-span-8">
-        <CardHeader>
-          <CardTitle>Recent cases</CardTitle>
-          <CardDescription>The latest intimations, newest first</CardDescription>
-          <CardAction>
-            <LinkButton href="/jobs" variant="outline" size="sm">
-              View all
-              <ArrowUpRight className="size-3.5" />
-            </LinkButton>
-          </CardAction>
-        </CardHeader>
-        <CardContent className="px-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="pl-6 text-sm font-semibold">Vehicle</TableHead>
-                <TableHead className="text-sm font-semibold">Customer</TableHead>
-                <TableHead className="text-sm font-semibold">Bank</TableHead>
-                <TableHead className="text-sm font-semibold">Status</TableHead>
-                <TableHead className="pr-6 text-right text-sm font-semibold">
-                  Date
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {recent.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={5}
-                    className="py-10 text-center text-muted-foreground"
-                  >
-                    No cases yet — new intimations appear here as soon as they
-                    are created.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                recent.map((job) => {
-                  const pill = jobStatusPill(job.status);
-                  return (
-                    <TableRow key={job.id} className="border-b border-border">
-                      <TableCell className="py-3 pl-6">
-                        <Link
-                          href={inspectPathForJob(job.id, job.vehicle_type)}
-                          className="hover:underline"
-                        >
-                          <RegPlate value={job.vehicleno} />
-                        </Link>
-                      </TableCell>
-                      <TableCell className="max-w-[170px] truncate font-medium">
-                        {job.cname ?? "—"}
-                      </TableCell>
-                      <TableCell className="max-w-[160px] truncate text-muted-foreground">
-                        {job.bank ?? "—"}
-                      </TableCell>
-                      <TableCell>
-                        {pill ? (
-                          <StatusPill tone={pill.tone}>{pill.label}</StatusPill>
-                        ) : (
-                          "—"
-                        )}
-                      </TableCell>
-                      <TableCell className="pr-6 text-right text-muted-foreground tabular-nums">
-                        {job.cdate.toLocaleDateString("en-IN", {
-                          day: "2-digit",
-                          month: "short",
-                        })}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
+      <Card className="col-span-12 gap-0 overflow-hidden rounded-2xl py-0 shadow-sm lg:col-span-8">
+        <CaseAnalyticsChart data={analytics} />
       </Card>
 
       {/* Side panels */}
       <div className="col-span-12 flex flex-col gap-6 lg:col-span-4">
-        <Card>
+        <Card className="rounded-2xl shadow-sm">
           <CardHeader>
             <CardTitle>Where cases are waiting</CardTitle>
             <CardDescription>Open work by stage</CardDescription>
@@ -287,7 +200,7 @@ export function DashboardView({
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="flex-1 rounded-2xl shadow-sm">
           <CardHeader>
             <CardTitle>Quick links</CardTitle>
           </CardHeader>
@@ -297,7 +210,7 @@ export function DashboardView({
                 <li key={l.href}>
                   <Link
                     href={l.href}
-                    className="group flex items-center justify-between rounded-md px-3 py-2.5 font-medium transition-colors hover:bg-lightprimary hover:text-primary"
+                    className="group flex items-center justify-between rounded-xl px-3 py-2.5 font-medium transition-colors hover:bg-lightprimary hover:text-primary"
                   >
                     {l.label}
                     <ArrowUpRight className="size-3.5 text-muted-foreground transition-colors group-hover:text-primary" />

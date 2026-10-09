@@ -8,7 +8,10 @@ import type {
   PersonRole,
   PersonUpdateInput,
 } from "@/lib/account/schemas";
-import { clampSurveyorPermissions } from "@/lib/account/permissions-policy";
+import {
+  clampSurveyorPermissions,
+  surveyorPermissionCeiling,
+} from "@/lib/account/permissions-policy";
 import { db } from "@/lib/db";
 
 export const staffPasswordSchema = z
@@ -552,7 +555,24 @@ export async function listHoStaffForPermissions() {
   });
 }
 
+const PERMISSION_ACTIONS = ["view", "entry", "edit", "delete"] as const;
+
 export async function getPermissionMatrix(staffId: number) {
+  const staff = await db.users.findFirst({
+    where: { id: staffId, is_deleted: 0 },
+    select: {
+      id: true,
+      first_name: true,
+      last_name: true,
+      email: true,
+      type: true,
+      parent_id: true,
+    },
+  });
+  if (!staff || !["HO", "RO", "Surveyor"].includes(staff.type ?? "")) {
+    throw new Error("NOT_FOUND");
+  }
+
   const menus = await db.menus.findMany({
     where: { is_deleted: 0 },
     orderBy: [{ module: "asc" }, { id: "asc" }],
@@ -565,6 +585,28 @@ export async function getPermissionMatrix(staffId: number) {
   });
   const grantedSet = new Set(granted.map((g) => g.permission));
 
+  let parentName: string | null = null;
+  let parentSet: Set<string> | null = null;
+  if (staff.type === "Surveyor") {
+    if (staff.parent_id != null) {
+      const parent = await db.users.findFirst({
+        where: { id: staff.parent_id, is_deleted: 0 },
+        select: { first_name: true, last_name: true },
+      });
+      parentName = parent
+        ? `${parent.first_name} ${parent.last_name}`.trim()
+        : null;
+      const parentPerms = await db.user_permissions.findMany({
+        where: { user_id: staff.parent_id, is_deleted: 0 },
+        select: { permission: true },
+      });
+      parentSet = new Set(parentPerms.map((p) => p.permission));
+    } else {
+      parentSet = new Set();
+    }
+  }
+
+  const ceiling = surveyorPermissionCeiling();
   const byModule = new Map<
     string,
     Array<{
@@ -575,12 +617,29 @@ export async function getPermissionMatrix(staffId: number) {
       entry: boolean;
       edit: boolean;
       delete: boolean;
+      lock: Partial<Record<(typeof PERMISSION_ACTIONS)[number], string>>;
     }>
   >();
 
   for (const menu of menus) {
     if (!menu.short_code) continue;
     const module = (menu.module ?? "Other").trim() || "Other";
+    const lock: Partial<Record<(typeof PERMISSION_ACTIONS)[number], string>> =
+      {};
+    if (staff.type === "Surveyor") {
+      for (const action of PERMISSION_ACTIONS) {
+        const key = `${menu.short_code}_${action}`;
+        if (!ceiling.has(key)) {
+          lock[action] = "Surveyors cannot be given this menu.";
+        } else if (staff.parent_id == null) {
+          lock[action] = "Assign this surveyor to an RO first.";
+        } else if (!parentSet?.has(key)) {
+          lock[action] = parentName
+            ? `${parentName} does not have this permission.`
+            : "The parent RO does not have this permission.";
+        }
+      }
+    }
     const row = {
       id: menu.id,
       name: menu.name ?? menu.short_code,
@@ -589,6 +648,7 @@ export async function getPermissionMatrix(staffId: number) {
       entry: grantedSet.has(`${menu.short_code}_entry`),
       edit: grantedSet.has(`${menu.short_code}_edit`),
       delete: grantedSet.has(`${menu.short_code}_delete`),
+      lock,
     };
     const list = byModule.get(module) ?? [];
     list.push(row);
@@ -596,6 +656,13 @@ export async function getPermissionMatrix(staffId: number) {
   }
 
   return {
+    member: {
+      id: staff.id,
+      name: `${staff.first_name} ${staff.last_name}`.trim(),
+      email: staff.email,
+      type: staff.type,
+      parent_name: parentName,
+    },
     modules: [...byModule.entries()].map(([module, items]) => ({
       module,
       items,
@@ -614,45 +681,87 @@ export async function saveStaffPermissions(
   });
   if (!staff) throw new Error("NOT_FOUND");
 
-  let permissions = input.permissions;
+  if (!["HO", "RO", "Surveyor"].includes(staff.type ?? "")) {
+    throw new Error("NOT_FOUND");
+  }
+
+  const menus = await db.menus.findMany({
+    where: { is_deleted: 0, short_code: { not: null } },
+    select: { short_code: true },
+  });
+  const known = new Set<string>();
+  for (const menu of menus) {
+    if (!menu.short_code) continue;
+    for (const action of PERMISSION_ACTIONS) {
+      known.add(`${menu.short_code}_${action}`);
+    }
+  }
+
+  let permissions = [...new Set(input.permissions.filter((p) => known.has(p)))];
   if (staff.type === "Surveyor") {
-    // Hard ceiling + never above parent RO grants
     permissions = clampSurveyorPermissions(permissions);
-    if (staff.parent_id != null) {
+    if (staff.parent_id == null) {
+      permissions = [];
+    } else {
       const parentPerms = await db.user_permissions.findMany({
         where: { user_id: staff.parent_id, is_deleted: 0 },
         select: { permission: true },
       });
-      if (parentPerms.length > 0) {
-        const parentSet = new Set(parentPerms.map((p) => p.permission));
-        permissions = permissions.filter((p) => parentSet.has(p));
-      }
+      const parentSet = new Set(parentPerms.map((p) => p.permission));
+      permissions = permissions.filter((p) => parentSet.has(p));
     }
   }
 
   const now = new Date();
-  await db.user_permissions.updateMany({
-    where: { user_id: input.staff_id, is_deleted: 0 },
-    data: {
-      is_deleted: 1,
-      updated_user_id: actorId,
-      updated_at: now,
-    },
+  await db.$transaction(async (tx) => {
+    await tx.user_permissions.updateMany({
+      where: { user_id: input.staff_id, is_deleted: 0 },
+      data: {
+        is_deleted: 1,
+        updated_user_id: actorId,
+        updated_at: now,
+      },
+    });
+
+    if (permissions.length === 0) return;
+
+    const existing = await tx.user_permissions.findMany({
+      where: { user_id: input.staff_id, permission: { in: permissions } },
+      select: { id: true, permission: true },
+      orderBy: { id: "desc" },
+    });
+    const revive = new Map<string, number>();
+    for (const row of existing) {
+      if (!revive.has(row.permission)) revive.set(row.permission, row.id);
+    }
+    const reviveIds = [...revive.values()];
+    if (reviveIds.length > 0) {
+      await tx.user_permissions.updateMany({
+        where: { id: { in: reviveIds } },
+        data: {
+          is_deleted: 0,
+          updated_user_id: actorId,
+          updated_at: now,
+        },
+      });
+    }
+    const missing = permissions.filter((permission) => !revive.has(permission));
+    if (missing.length > 0) {
+      await tx.user_permissions.createMany({
+        data: missing.map((permission) => ({
+          user_id: input.staff_id,
+          permission,
+          is_deleted: 0,
+          created_user_id: actorId,
+          updated_user_id: actorId,
+          created_at: now,
+          updated_at: now,
+        })),
+      });
+    }
   });
 
-  if (permissions.length === 0) return;
-
-  await db.user_permissions.createMany({
-    data: permissions.map((permission) => ({
-      user_id: input.staff_id,
-      permission,
-      is_deleted: 0,
-      created_user_id: actorId,
-      updated_user_id: actorId,
-      created_at: now,
-      updated_at: now,
-    })),
-  });
+  return { permissions };
 }
 
 export async function pingLastActivity(userId: number, online: boolean) {

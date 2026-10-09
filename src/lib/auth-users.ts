@@ -37,6 +37,41 @@ export async function getUserPermissions(
   }
 }
 
+/** Fresh role, status, and permissions for an existing session. */
+export async function loadActiveSessionUser(
+  userId: number,
+): Promise<SessionUser | null> {
+  if (!Number.isFinite(userId) || userId <= 0) return null;
+
+  const user = await db.users.findFirst({
+    where: { id: userId },
+  });
+  if (!user || user.is_deleted === 1) return null;
+
+  if (user.status != null) {
+    const status = String(user.status).trim().toLowerCase();
+    if (status === "inactive" || status === "0") return null;
+  }
+
+  const type = String(user.type ?? "").trim();
+  if ((type === "RO" || type === "Surveyor") && user.verified_at == null) {
+    return null;
+  }
+
+  const permissions = await getUserPermissions(user.id, user.type);
+  return toSessionUser({
+    id: user.id,
+    first_name: user.first_name,
+    last_name: user.last_name,
+    email: user.email,
+    type: user.type,
+    is_admin: user.is_admin,
+    bank_id: user.bank_id,
+    city_id: user.city_id,
+    permissions,
+  });
+}
+
 export async function authenticateUser(
   email: string,
   password: string,

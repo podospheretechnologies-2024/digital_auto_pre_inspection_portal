@@ -3,25 +3,37 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Ban,
-  Building2,
-  CarFront,
+  Banknote,
+  Boxes,
+  Calendar,
+  Car,
+  Factory,
+  FileDigit,
   Check,
   ClipboardPlus,
   CloudUpload,
+  CreditCard,
   Eye,
-  FileDigit,
+  Hash,
   ImageIcon,
   ImagePlus,
+  Landmark,
+  Layers,
   Loader2,
+  MapPin,
+  MessageSquare,
   Pencil,
+  Phone,
   RotateCcw,
   ShieldCheck,
   Trash2,
+  Truck,
   X,
   UserPlus,
   UserRound,
 } from "lucide-react";
 import {
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -29,6 +41,7 @@ import {
   type ReactNode,
 } from "react";
 import { toast } from "sonner";
+import { toast as notice } from "@/lib/toast";
 
 import { RegPlate } from "@/components/atlas/reg-plate";
 import { CaseListToolbar } from "@/components/jobs/case-list-toolbar";
@@ -47,7 +60,12 @@ import {
   JobsTableHead,
   JobsTableHeader,
   JobsTableRow,
+  SheetBank,
+  SheetDateTime,
+  SheetPager,
+  SheetPerson,
   TableBody,
+  useSheetPage,
 } from "@/components/jobs/jobs-listing";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -76,7 +94,8 @@ import {
   type CaseListFilterState,
 } from "@/lib/jobs/case-list-filters";
 import { paymentModes, vehicleTypes } from "@/lib/jobs/schemas";
-import { formatDeskDate, resolveWheelKind } from "@/lib/jobs/helpers";
+import { resolveWheelKind } from "@/lib/jobs/helpers";
+import { refreshJobSheets } from "@/lib/jobs/refresh-sheets";
 import { cn } from "@/lib/utils";
 
 type LookupItem = { id: number; name: string };
@@ -117,6 +136,7 @@ type JobRow = {
   bank_ref_no: string | null;
   cdate: string | null;
   created_at: string | null;
+  stage_reason?: string | null;
   assigned_at?: string | null;
   hold_at?: string | null;
   cancelled_at?: string | null;
@@ -127,21 +147,66 @@ function FormSection({
   icon: Icon,
   title,
   children,
+  panel = false,
 }: {
   icon: ComponentType<{ className?: string }>;
   title: string;
   children: ReactNode;
+  panel?: boolean;
 }) {
   return (
-    <section className="space-y-2.5">
-      <div className="flex items-center gap-2 border-b border-border/60 pb-1.5">
-        <Icon className="size-3.5 text-primary" />
+    <section
+      className={
+        panel
+          ? "rounded-xl border border-border/70 bg-muted/20 p-3.5 sm:p-4"
+          : "space-y-2.5"
+      }
+    >
+      <div
+        className={cn(
+          "flex items-center gap-2",
+          panel ? "mb-3.5" : "border-b border-border/60 pb-1.5",
+        )}
+      >
+        <span
+          className={cn(
+            "flex shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary",
+            title === "Bank" || title === "Vehicle" ? "size-5" : "size-6",
+          )}
+        >
+          <Icon
+            className={title === "Bank" || title === "Vehicle" ? "size-3" : "size-3.5"}
+            strokeWidth={1.75}
+          />
+        </span>
         <h3 className="text-[11px] font-semibold tracking-[0.08em] text-foreground uppercase">
           {title}
         </h3>
       </div>
       {children}
     </section>
+  );
+}
+
+function FieldLabel({
+  htmlFor,
+  icon: Icon,
+  children,
+}: {
+  htmlFor?: string;
+  icon: ComponentType<{ className?: string }>;
+  children: ReactNode;
+}) {
+  return (
+    <Label
+      htmlFor={htmlFor}
+      className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground"
+    >
+      <span className="flex size-5 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+        <Icon className="size-3" strokeWidth={1.75} />
+      </span>
+      {children}
+    </Label>
   );
 }
 
@@ -195,6 +260,10 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<CaseListFilterState>(EMPTY_CASE_FILTERS);
   const [form, setForm] = useState(createEmptyForm);
+  const [fieldError, setFieldError] = useState<{
+    id: string;
+    message: string;
+  } | null>(null);
   const [assignJob, setAssignJob] = useState<JobRow | null>(null);
   const [selectedRoId, setSelectedRoId] = useState("");
   const [selectedSurveyorId, setSelectedSurveyorId] = useState("");
@@ -206,6 +275,8 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
   } | null>(null);
   const [cancelJobId, setCancelJobId] = useState<number | null>(null);
   const [holdJobId, setHoldJobId] = useState<number | null>(null);
+  const [confirmEdit, setConfirmEdit] = useState(false);
+  const [confirmSubmitQc, setConfirmSubmitQc] = useState(false);
   const [editingJobId, setEditingJobId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState(createEmptyForm);
   const [editLoading, setEditLoading] = useState(false);
@@ -255,6 +326,7 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
     queryFn: async () => {
       const json = await apiJson<{ data: JobRow[] }>(
         `/api/v2/jobs?list=${listKey}&limit=100`,
+        { cache: "no-store" },
       );
       return json.data;
     },
@@ -862,35 +934,15 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
       return true;
     },
     onSuccess: async () => {
-      toast.success("Submitted to Quality Check");
+      notice.success("Submitted to Quality Check");
       closeUploadDialog();
-      await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      await refreshJobSheets(queryClient);
     },
     onError: (e: Error) => toast.error(e.message),
   });
   const createMutation = useMutation({
     mutationFn: async () => {
-      const missing: string[] = [];
-      if (!form.cdate) missing.push("Date");
-      if (!form.cname.trim()) missing.push("Customer name");
-      if (!form.mobileno.trim()) missing.push("Mobile");
-      if (!form.address.trim()) missing.push("Address");
-      if (!form.bank_id) missing.push("Bank");
-      if (!form.bank_ref_no.trim()) missing.push("Bank ref no");
-      if (!form.vehicleno.trim()) missing.push("Vehicle no");
-      if (!form.company_id) missing.push("Company");
-      if (!form.model_id) missing.push("Model");
-      if (!form.variant_id) missing.push("Variant");
-
-      if (missing.length > 0) {
-        throw new Error(`Please fill: ${missing.join(", ")}`);
-      }
-
       const mobile = form.mobileno.replace(/\D/g, "");
-      if (mobile.length < 10) {
-        throw new Error("Mobile must be at least 10 digits");
-      }
-
       return apiJson<{ data: { id: number; dti_no: string; cname: string | null; vehicleno: string } }>(
         "/api/v2/jobs",
         {
@@ -917,6 +969,7 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
     onSuccess: (res) => {
       setCreatedCase(res.data);
       setForm(createEmptyForm());
+      setFieldError(null);
       void queryClient.invalidateQueries({ queryKey: ["jobs"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -934,10 +987,10 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
         method: "POST",
         body: JSON.stringify({ agent_id: agentId }),
       }),
-    onSuccess: () => {
-      toast.success("Case assigned — moved to Assign Case queue");
+    onSuccess: async () => {
+      notice.success("Case assigned — moved to Assign Case queue");
       closeAssignDialog();
-      void queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      await refreshJobSheets(queryClient);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -954,9 +1007,9 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
         method: "POST",
         body: JSON.stringify({ action }),
       }),
-    onSuccess: (_d, vars) => {
-      toast.success(vars.action === "hold" ? "Moved to Hold" : "Cancelled");
-      void queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    onSuccess: async (_d, vars) => {
+      notice.success(vars.action === "hold" ? "Moved to Hold" : "Cancelled");
+      await refreshJobSheets(queryClient);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -1003,7 +1056,7 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
       });
     },
     onSuccess: () => {
-      toast.success("Case updated");
+      notice.success("Case updated");
       closeEditDialog();
       void queryClient.invalidateQueries({ queryKey: ["jobs"] });
     },
@@ -1049,6 +1102,70 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
       ),
     [allListRows, filters, mode],
   );
+  const sheet = useSheetPage(filteredListRows);
+
+  function nextCreateFieldError() {
+    if (!form.cdate) return { id: "cdate", message: "Please fill Date" };
+    if (!form.cname.trim()) {
+      return { id: "cname", message: "Please fill Customer name" };
+    }
+    if (!form.mobileno.trim()) {
+      return { id: "mobileno", message: "Please fill Mobile" };
+    }
+    if (form.mobileno.replace(/\D/g, "").length < 10) {
+      return { id: "mobileno", message: "Mobile must be at least 10 digits" };
+    }
+    if (!form.address.trim()) {
+      return { id: "address", message: "Please fill Address" };
+    }
+    if (!form.bank_id) return { id: "bank_id", message: "Please fill Bank" };
+    if (!form.bank_ref_no.trim()) {
+      return { id: "bank_ref_no", message: "Please fill Bank ref no" };
+    }
+    if (!form.vehicleno.trim()) {
+      return { id: "vehicleno", message: "Please fill Vehicle no" };
+    }
+    if (!form.company_id) {
+      return { id: "company_id", message: "Please fill Company" };
+    }
+    if (!form.model_id) return { id: "model_id", message: "Please fill Model" };
+    if (!form.variant_id) {
+      return { id: "variant_id", message: "Please fill Variant" };
+    }
+    return null;
+  }
+
+  useEffect(() => {
+    if (!fieldError) return;
+    const current = nextCreateFieldError();
+    if (!current || current.id !== fieldError.id) setFieldError(null);
+  }, [form, fieldError]);
+
+  function submitCreate() {
+    const error = nextCreateFieldError();
+    if (error) {
+      setFieldError(error);
+      const el = document.getElementById(error.id);
+      el?.focus();
+      el?.scrollIntoView({ block: "center", behavior: "smooth" });
+      return;
+    }
+    setFieldError(null);
+    createMutation.mutate();
+  }
+
+  function fieldNote(id: string) {
+    if (fieldError?.id !== id) return null;
+    return (
+      <p className="text-center text-[11px] font-medium text-red-600">
+        {fieldError.message}
+      </p>
+    );
+  }
+
+  function fieldBorder(id: string, base: string) {
+    return cn(base, fieldError?.id === id && "border-red-500");
+  }
 
   const fieldClass = "min-w-0 space-y-1";
   const labelClass = "text-[11px] font-medium text-muted-foreground";
@@ -1060,8 +1177,21 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
     "focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20",
     "disabled:cursor-not-allowed disabled:opacity-50",
   );
+  const createFieldClass = "min-w-0 space-y-1.5";
+  const createGridClass =
+    "grid grid-cols-1 gap-x-4 gap-y-3.5 sm:grid-cols-2 lg:grid-cols-3";
+  const createControlClass =
+    "h-9 w-full rounded-lg bg-background text-[13px] shadow-none";
+  const createSelectClass = cn(
+    selectClass,
+    "h-9 rounded-lg bg-background px-3 shadow-none",
+  );
 
-  function renderTable(rows: JobRow[] | undefined, showAssign: boolean) {
+  function renderTable(
+    rows: JobRow[] | undefined,
+    showAssign: boolean,
+    start = 0,
+  ) {
     if ((rows ?? []).length === 0) return null;
     const isFresh = showAssign;
 
@@ -1077,25 +1207,23 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
             <JobsTableHead>Bank</JobsTableHead>
             {isFresh ? null : <JobsTableHead>Agent</JobsTableHead>}
             <JobsTableHead>Date</JobsTableHead>
+            <JobsTableHead>Reason</JobsTableHead>
             <JobsTableHead className="text-right">Actions</JobsTableHead>
           </JobsTableRow>
         </JobsTableHeader>
         <TableBody>
           {(rows ?? []).map((job, index) => (
             <JobsTableRow key={job.id}>
-              <JobSerialCell index={index} />
+              <JobSerialCell index={start + index} />
               <JobsTableCell>
                 <JobDtiCell value={job.dti_no ?? job.id} />
               </JobsTableCell>
               <JobsTableCell>
-                <div className="font-medium text-foreground">
-                  {job.cname ?? "—"}
-                </div>
-                <JobMetaLine>{job.mobileno}</JobMetaLine>
+                <SheetPerson name={job.cname} phone={job.mobileno} />
               </JobsTableCell>
-              <JobsTableCell>
-                <RegPlate value={job.vehicleno} />
-                <JobMetaLine>
+              <JobsTableCell className="align-top">
+                <RegPlate value={job.vehicleno} className="-mt-0.5" />
+                <JobMetaLine full>
                   {[job.company, job.model, job.variant]
                     .filter(Boolean)
                     .join(" / ")}
@@ -1107,23 +1235,29 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
                 </span>
               </JobsTableCell>
               <JobsTableCell>
-                <div
-                  className="max-w-[150px] truncate font-medium"
-                  title={job.bankname ?? undefined}
-                >
-                  {job.bankname ?? "—"}
-                </div>
-                <JobMetaLine>{job.bank_ref_no}</JobMetaLine>
+                <SheetBank name={job.bankname} meta={job.bank_ref_no} />
               </JobsTableCell>
               {isFresh ? null : (
-                <JobsTableCell>{job.agent_name ?? "—"}</JobsTableCell>
+                <JobsTableCell>
+                  <SheetPerson name={job.agent_name} />
+                </JobsTableCell>
               )}
-              <JobsTableCell className="tabular-nums text-muted-foreground">
-                {formatDeskDate(
-                  isFresh
-                    ? (job.created_at ?? job.cdate)
-                    : (job.assigned_at ?? job.created_at),
-                )}
+              <JobsTableCell>
+                <SheetDateTime
+                  value={
+                    isFresh
+                      ? (job.created_at ?? job.cdate)
+                      : (job.assigned_at ?? job.created_at)
+                  }
+                />
+              </JobsTableCell>
+              <JobsTableCell>
+                <div
+                  className="max-w-[12rem] truncate text-[12px]"
+                  title={job.stage_reason ?? undefined}
+                >
+                  {job.stage_reason || "—"}
+                </div>
               </JobsTableCell>
               <JobsTableCell>
                 <JobActions>
@@ -1196,8 +1330,8 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
       />
 
       {mode === "assign" ? (
-        <Card className="overflow-hidden border-border/70">
-          <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 border-b border-border/70 px-4 py-2.5">
+        <Card className="overflow-hidden rounded-2xl border-border/70 shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 border-b border-border/70 bg-gradient-to-r from-primary/5 to-transparent px-4 py-3.5 sm:px-5">
             <div className="flex min-w-0 items-center gap-2.5">
               <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
                 <ClipboardPlus className="size-4" />
@@ -1213,79 +1347,86 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
             </div>
           </CardHeader>
 
-          <CardContent className="space-y-4 px-4 py-3.5 sm:px-5">
-            <FormSection icon={UserRound} title="Customer">
-              <div className={gridClass}>
-                <div className={fieldClass}>
-                  <Label htmlFor="cdate" className={labelClass}>
+          <CardContent className="space-y-3.5 px-4 py-4 sm:px-5">
+            <FormSection panel icon={UserRound} title="Customer">
+              <div className={createGridClass}>
+                <div className={createFieldClass}>
+                  <FieldLabel htmlFor="cdate" icon={Calendar}>
                     Date
-                  </Label>
+                  </FieldLabel>
                   <Input
                     id="cdate"
                     type="date"
-                    className={controlClass}
+                    className={fieldBorder("cdate", createControlClass)}
                     value={form.cdate}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, cdate: e.target.value }))
                     }
                   />
+                  {fieldNote("cdate")}
                 </div>
-                <div className={fieldClass}>
-                  <Label htmlFor="cname" className={labelClass}>
+                <div className={createFieldClass}>
+                  <FieldLabel htmlFor="cname" icon={UserRound}>
                     Customer name
-                  </Label>
+                  </FieldLabel>
                   <Input
                     id="cname"
                     placeholder="Full name"
-                    className={controlClass}
+                    className={fieldBorder("cname", createControlClass)}
                     value={form.cname}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, cname: e.target.value }))
                     }
                   />
+                  {fieldNote("cname")}
                 </div>
-                <div className={fieldClass}>
-                  <Label htmlFor="mobileno" className={labelClass}>
+                <div className={createFieldClass}>
+                  <FieldLabel htmlFor="mobileno" icon={Phone}>
                     Mobile
-                  </Label>
+                  </FieldLabel>
                   <Input
                     id="mobileno"
                     placeholder="10-digit mobile"
                     inputMode="numeric"
-                    className={controlClass}
+                    className={fieldBorder("mobileno", createControlClass)}
                     value={form.mobileno}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, mobileno: e.target.value }))
                     }
                   />
+                  {fieldNote("mobileno")}
                 </div>
-                <div className={cn(fieldClass, "sm:col-span-2 lg:col-span-3")}>
-                  <Label htmlFor="address" className={labelClass}>
+                <div className={cn(createFieldClass, "sm:col-span-2 lg:col-span-3")}>
+                  <FieldLabel htmlFor="address" icon={MapPin}>
                     Address
-                  </Label>
+                  </FieldLabel>
                   <Textarea
                     id="address"
                     rows={2}
                     placeholder="Inspection / customer address"
-                    className="field-sizing-fixed h-16 w-full resize-y py-2 text-[13px] leading-snug"
+                    className={fieldBorder(
+                      "address",
+                      "field-sizing-fixed h-20 w-full resize-y rounded-lg bg-background py-2 text-[13px] leading-snug shadow-none",
+                    )}
                     value={form.address}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, address: e.target.value }))
                     }
                   />
+                  {fieldNote("address")}
                 </div>
               </div>
             </FormSection>
 
-            <FormSection icon={Building2} title="Bank">
-              <div className={gridClass}>
-                <div className={fieldClass}>
-                  <Label htmlFor="bank_id" className={labelClass}>
+            <FormSection panel icon={Landmark} title="Bank">
+              <div className={createGridClass}>
+                <div className={createFieldClass}>
+                  <FieldLabel htmlFor="bank_id" icon={Banknote}>
                     Bank
-                  </Label>
+                  </FieldLabel>
                   <select
                     id="bank_id"
-                    className={selectClass}
+                    className={fieldBorder("bank_id", createSelectClass)}
                     value={form.bank_id}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, bank_id: e.target.value }))
@@ -1298,28 +1439,30 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
                       </option>
                     ))}
                   </select>
+                  {fieldNote("bank_id")}
                 </div>
-                <div className={fieldClass}>
-                  <Label htmlFor="bank_ref_no" className={labelClass}>
+                <div className={createFieldClass}>
+                  <FieldLabel htmlFor="bank_ref_no" icon={FileDigit}>
                     Bank ref no
-                  </Label>
+                  </FieldLabel>
                   <Input
                     id="bank_ref_no"
                     placeholder="Reference number"
-                    className={controlClass}
+                    className={fieldBorder("bank_ref_no", createControlClass)}
                     value={form.bank_ref_no}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, bank_ref_no: e.target.value }))
                     }
                   />
+                  {fieldNote("bank_ref_no")}
                 </div>
-                <div className={fieldClass}>
-                  <Label htmlFor="mode" className={labelClass}>
+                <div className={createFieldClass}>
+                  <FieldLabel htmlFor="mode" icon={CreditCard}>
                     Payment mode
-                  </Label>
+                  </FieldLabel>
                   <select
                     id="mode"
-                    className={selectClass}
+                    className={createSelectClass}
                     value={form.mode}
                     onChange={(e) =>
                       setForm((f) => ({
@@ -1338,15 +1481,15 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
               </div>
             </FormSection>
 
-            <FormSection icon={CarFront} title="Vehicle">
-              <div className={gridClass}>
-                <div className={fieldClass}>
-                  <Label htmlFor="vehicle_type" className={labelClass}>
+            <FormSection panel icon={Car} title="Vehicle">
+              <div className={createGridClass}>
+                <div className={createFieldClass}>
+                  <FieldLabel htmlFor="vehicle_type" icon={Truck}>
                     Vehicle type
-                  </Label>
+                  </FieldLabel>
                   <select
                     id="vehicle_type"
-                    className={selectClass}
+                    className={createSelectClass}
                     value={form.vehicle_type}
                     onChange={(e) =>
                       setForm((f) => ({
@@ -1363,14 +1506,14 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
                     ))}
                   </select>
                 </div>
-                <div className={fieldClass}>
-                  <Label htmlFor="vehicleno" className={labelClass}>
+                <div className={createFieldClass}>
+                  <FieldLabel htmlFor="vehicleno" icon={Hash}>
                     Vehicle no
-                  </Label>
+                  </FieldLabel>
                   <Input
                     id="vehicleno"
                     placeholder="e.g. MH12AB1234"
-                    className={controlClass}
+                    className={fieldBorder("vehicleno", cn(createControlClass, "font-medium uppercase tracking-wide"))}
                     value={form.vehicleno}
                     onChange={(e) =>
                       setForm((f) => ({
@@ -1379,14 +1522,15 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
                       }))
                     }
                   />
+                  {fieldNote("vehicleno")}
                 </div>
-                <div className={fieldClass}>
-                  <Label htmlFor="company_id" className={labelClass}>
+                <div className={createFieldClass}>
+                  <FieldLabel htmlFor="company_id" icon={Factory}>
                     Company
-                  </Label>
+                  </FieldLabel>
                   <select
                     id="company_id"
-                    className={selectClass}
+                    className={fieldBorder("company_id", createSelectClass)}
                     value={form.company_id}
                     onChange={(e) =>
                       setForm((f) => ({
@@ -1404,14 +1548,15 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
                       </option>
                     ))}
                   </select>
+                  {fieldNote("company_id")}
                 </div>
-                <div className={fieldClass}>
-                  <Label htmlFor="model_id" className={labelClass}>
+                <div className={createFieldClass}>
+                  <FieldLabel htmlFor="model_id" icon={Boxes}>
                     Model
-                  </Label>
+                  </FieldLabel>
                   <select
                     id="model_id"
-                    className={selectClass}
+                    className={fieldBorder("model_id", createSelectClass)}
                     value={form.model_id}
                     disabled={!form.company_id}
                     onChange={(e) =>
@@ -1429,14 +1574,15 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
                       </option>
                     ))}
                   </select>
+                  {fieldNote("model_id")}
                 </div>
-                <div className={fieldClass}>
-                  <Label htmlFor="variant_id" className={labelClass}>
+                <div className={createFieldClass}>
+                  <FieldLabel htmlFor="variant_id" icon={Layers}>
                     Variant
-                  </Label>
+                  </FieldLabel>
                   <select
                     id="variant_id"
-                    className={selectClass}
+                    className={fieldBorder("variant_id", createSelectClass)}
                     value={form.variant_id}
                     disabled={!form.model_id}
                     onChange={(e) =>
@@ -1450,15 +1596,16 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
                       </option>
                     ))}
                   </select>
+                  {fieldNote("variant_id")}
                 </div>
-                <div className={fieldClass}>
-                  <Label htmlFor="remark" className={labelClass}>
+                <div className={createFieldClass}>
+                  <FieldLabel htmlFor="remark" icon={MessageSquare}>
                     Remark
-                  </Label>
+                  </FieldLabel>
                   <Input
                     id="remark"
                     placeholder="Optional notes"
-                    className={controlClass}
+                    className={createControlClass}
                     value={form.remark}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, remark: e.target.value }))
@@ -1469,13 +1616,16 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
             </FormSection>
           </CardContent>
 
-          <div className="flex flex-wrap items-center justify-end gap-2.5 border-t border-border/70 bg-muted/25 px-4 py-3 sm:px-5">
+          <div className="flex flex-wrap items-center justify-end gap-2.5 border-t border-border/70 bg-muted/15 px-4 py-3.5 sm:px-5">
             <Button
               type="button"
               variant="outline"
               size="sm"
               disabled={createMutation.isPending}
-              onClick={() => setForm(createEmptyForm())}
+              onClick={() => {
+                setForm(createEmptyForm());
+                setFieldError(null);
+              }}
               className={cn(
                 "h-9 min-w-[6.5rem] gap-2 rounded-md px-4 text-[13px] font-medium",
                 "border-border bg-background transition-all duration-200",
@@ -1492,7 +1642,7 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
               type="button"
               size="sm"
               disabled={createMutation.isPending}
-              onClick={() => createMutation.mutate()}
+              onClick={submitCreate}
               className={cn(
                 "h-9 min-w-[10.5rem] gap-2 rounded-md px-4 text-[13px] font-medium",
                 "transition-all duration-200",
@@ -1520,6 +1670,7 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
           }
           count={filteredListRows.length}
           totalCount={allListRows.length}
+          mark={mode === "schedule" ? "assigned" : "fresh"}
           loading={listQuery.isLoading}
           error={
             listQuery.isError
@@ -1542,8 +1693,17 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
               showSurveyor={mode === "schedule"}
             />
           }
+          footer={
+            filteredListRows.length > 0 ? (
+              <SheetPager
+                page={sheet.page}
+                pageCount={sheet.pageCount}
+                onPage={sheet.setPage}
+              />
+            ) : null
+          }
         >
-          {renderTable(filteredListRows, mode !== "schedule")}
+          {renderTable(sheet.pageItems, mode !== "schedule", sheet.start)}
         </JobsListingCard>
       )}
 
@@ -1762,7 +1922,7 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
                 </div>
               </FormSection>
 
-              <FormSection icon={Building2} title="Bank">
+              <FormSection icon={Landmark} title="Bank">
                 <div className={gridClass}>
                   <div className={fieldClass}>
                     <Label className={labelClass}>Bank</Label>
@@ -1816,7 +1976,7 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
                 </div>
               </FormSection>
 
-              <FormSection icon={CarFront} title="Vehicle">
+              <FormSection icon={Car} title="Vehicle">
                 <div className={gridClass}>
                   <div className={fieldClass}>
                     <Label className={labelClass}>Vehicle type</Label>
@@ -1941,7 +2101,7 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
                   type="button"
                   className="h-9 min-w-[7.5rem] gap-1.5 shadow-none"
                   disabled={editMutation.isPending || editLoading}
-                  onClick={() => editMutation.mutate()}
+                  onClick={() => setConfirmEdit(true)}
                 >
                   {editMutation.isPending ? (
                     <Loader2 className="size-3.5 animate-spin" />
@@ -2223,7 +2383,7 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
                   uploadPhotos.length === 0 ||
                   pendingUploads.length > 0
                 }
-                onClick={() => submitToQcMutation.mutate()}
+                onClick={() => setConfirmSubmitQc(true)}
               >
                 {submitToQcMutation.isPending ? (
                   <Loader2 className="size-3.5 animate-spin" />
@@ -2263,6 +2423,34 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
       </Dialog>
 
       <ConfirmDialog
+        open={confirmEdit}
+        onOpenChange={setConfirmEdit}
+        title="Save this case?"
+        description="The case details will be updated."
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
+        loading={editMutation.isPending}
+        onConfirm={() => {
+          setConfirmEdit(false);
+          editMutation.mutate();
+        }}
+      />
+
+      <ConfirmDialog
+        open={confirmSubmitQc}
+        onOpenChange={setConfirmSubmitQc}
+        title="Submit to Quality Check?"
+        description="This case will move to the Quality Check queue."
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
+        loading={submitToQcMutation.isPending}
+        onConfirm={() => {
+          setConfirmSubmitQc(false);
+          submitToQcMutation.mutate();
+        }}
+      />
+
+      <ConfirmDialog
         open={holdJobId != null}
         onOpenChange={(open) => {
           if (!open) setHoldJobId(null);
@@ -2270,8 +2458,8 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
         tone="hold"
         title="Put this case on Hold?"
         description="The case will move to the Hold queue. You can resume it anytime from there."
-        confirmLabel="Hold case"
-        cancelLabel="Keep working"
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
         loading={workflowMutation.isPending}
         onConfirm={() => {
           if (holdJobId == null) return;
@@ -2290,8 +2478,8 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
         tone="danger"
         title="Cancel this case?"
         description="The case will move to the Cancel queue. You can restore it later if needed."
-        confirmLabel="Cancel case"
-        cancelLabel="Keep case"
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
         loading={workflowMutation.isPending}
         onConfirm={() => {
           if (cancelJobId == null) return;
@@ -2356,7 +2544,7 @@ export function AssignJobsPage({ mode = "assign" }: AssignPageProps) {
                 </div>
                 <div className="flex items-center gap-2.5">
                   <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-slate-800 text-white">
-                    <CarFront className="size-3.5" />
+                    <Car className="size-3.5" />
                   </span>
                   <div className="min-w-0 flex-1">
                     <dt className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">

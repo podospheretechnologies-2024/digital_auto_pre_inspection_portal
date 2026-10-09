@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
+import { loadActiveSessionUser } from "@/lib/auth-users";
 import {
   hasPermission,
   isAdmin,
@@ -8,19 +9,51 @@ import {
   isAdminOrBank,
   isAll,
   isBoth,
+  isKnownRole,
 } from "@/lib/rbac";
 import type { SessionUser } from "@/types/next-auth";
+
+/** Page permission (`*_view`). Separate from button entry/edit/delete. */
+export function denyUnlessPagePermission(
+  user: SessionUser,
+  viewPermission: string,
+): NextResponse | null {
+  if (!isKnownRole(user) || !hasPermission(user, viewPermission)) {
+    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  }
+  return null;
+}
+
+/** Button permission (`*_entry` / `*_edit` / `*_delete`). */
+export function denyUnlessButtonPermission(
+  user: SessionUser,
+  actionPermission: string,
+): NextResponse | null {
+  if (!isKnownRole(user) || !hasPermission(user, actionPermission)) {
+    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  }
+  return null;
+}
 
 export async function requireSessionUser(): Promise<
   SessionUser | NextResponse
 > {
   const session = await auth();
 
-  if (!session?.user) {
+  if (!session?.user?.id) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  return session.user;
+  try {
+    const user = await loadActiveSessionUser(Number(session.user.id));
+    if (!user || !isKnownRole(user)) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+    return user;
+  } catch (error) {
+    console.error("[api] session reload failed", error);
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
 }
 
 /** Laravel IsAdmin middleware */
@@ -57,9 +90,8 @@ export async function requireBothWithPermission(
   const user = await requireBothUser();
   if (user instanceof NextResponse) return user;
 
-  if (!hasPermission(user, permission)) {
-    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-  }
+  const denied = denyUnlessButtonPermission(user, permission);
+  if (denied) return denied;
 
   return user;
 }

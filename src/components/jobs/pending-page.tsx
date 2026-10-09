@@ -17,10 +17,14 @@ import {
   JobsTableHead,
   JobsTableHeader,
   JobsTableRow,
+  SheetDateTime,
+  SheetPager,
+  SheetPerson,
   TableBody,
+  useSheetPage,
 } from "@/components/jobs/jobs-listing";
 import { PageHeader } from "@/components/layout/page-header";
-import { formatDeskDate, inspectPathForJob } from "@/lib/jobs/helpers";
+import { inspectPathForJob } from "@/lib/jobs/helpers";
 
 type JobRow = {
   id: number;
@@ -42,7 +46,9 @@ export function PendingJobsPage() {
   const listQuery = useQuery({
     queryKey: ["jobs", "pending"],
     queryFn: async () => {
-      const res = await fetch("/api/v2/jobs?list=pending&limit=100");
+      const res = await fetch("/api/v2/jobs?list=pending&limit=100", {
+        cache: "no-store",
+      });
       const json = await res.json();
       if (!res.ok) throw new Error(json.message || "Failed to load");
       return (json.data ?? []) as JobRow[];
@@ -50,6 +56,7 @@ export function PendingJobsPage() {
   });
 
   const rows = listQuery.data ?? [];
+  const sheet = useSheetPage(rows);
 
   return (
     <>
@@ -63,11 +70,21 @@ export function PendingJobsPage() {
         title="My pending cases"
         description="Open a case to fill the 2W / 3W / 4W inspection form"
         count={rows.length}
+        mark="pending"
         loading={listQuery.isLoading}
         error={
           listQuery.isError ? (listQuery.error as Error).message : null
         }
         empty="No pending jobs in your queue"
+        footer={
+          rows.length > 0 ? (
+            <SheetPager
+              page={sheet.page}
+              pageCount={sheet.pageCount}
+              onPage={sheet.setPage}
+            />
+          ) : null
+        }
       >
         {rows.length > 0 ? (
           <JobsTable>
@@ -84,24 +101,23 @@ export function PendingJobsPage() {
               </JobsTableRow>
             </JobsTableHeader>
             <TableBody>
-              {rows.map((job, index) => (
+              {sheet.pageItems.map((job, index) => (
                 <JobsTableRow key={job.id}>
-                  <JobSerialCell index={index} />
+                  <JobSerialCell index={sheet.start + index} />
                   <JobsTableCell>
                     <JobDtiCell value={job.dti_no ?? job.id} />
                   </JobsTableCell>
-                  <JobsTableCell className="tabular-nums text-muted-foreground">
-                    {formatDeskDate(
-                      job.assigned_at ?? job.created_at ?? job.cdate,
-                    )}
+                  <JobsTableCell>
+                    <SheetDateTime
+                      value={job.assigned_at ?? job.created_at ?? job.cdate}
+                    />
                   </JobsTableCell>
                   <JobsTableCell>
-                    <div className="font-medium">{job.cname ?? "—"}</div>
-                    <JobMetaLine>{job.mobileno}</JobMetaLine>
+                    <SheetPerson name={job.cname} phone={job.mobileno} />
                   </JobsTableCell>
-                  <JobsTableCell>
-                    <RegPlate value={job.vehicleno} />
-                    <JobMetaLine>
+                  <JobsTableCell className="align-top">
+                    <RegPlate value={job.vehicleno} className="-mt-0.5" />
+                    <JobMetaLine full>
                       {[job.company, job.model].filter(Boolean).join(" / ")}
                     </JobMetaLine>
                   </JobsTableCell>

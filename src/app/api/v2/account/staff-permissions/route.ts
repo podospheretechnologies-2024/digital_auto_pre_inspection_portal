@@ -23,6 +23,12 @@ export async function GET(request: Request) {
     const matrix = await getPermissionMatrix(staffId);
     return NextResponse.json({ data: { staff, ...matrix } });
   } catch (error) {
+    if (error instanceof Error && error.message === "NOT_FOUND") {
+      return NextResponse.json(
+        { message: "Staff member not found" },
+        { status: 404 },
+      );
+    }
     console.error(error);
     return NextResponse.json(
       { message: "Failed to load permissions" },
@@ -40,9 +46,15 @@ export async function PUT(request: Request) {
   if (!parsed.success) return zodErrorResponse(parsed.error);
 
   try {
-    await saveStaffPermissions(parsed.data, Number(user.id));
-    return NextResponse.json({ ok: true });
+    const saved = await saveStaffPermissions(parsed.data, Number(user.id));
+    return NextResponse.json({ ok: true, data: saved });
   } catch (error) {
+    if (error instanceof Error && error.message === "NOT_FOUND") {
+      return NextResponse.json(
+        { message: "Staff member not found" },
+        { status: 404 },
+      );
+    }
     console.error(error);
     return NextResponse.json({ message: "Save failed" }, { status: 500 });
   }

@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 
-import { DEFAULT_THEME, THEME_COOKIE } from "./theme.config";
+import { DEFAULT_THEME, THEMES, THEME_COOKIE } from "./theme.config";
 
 function setThemeCookie(theme: string) {
   if (typeof window === "undefined") return;
@@ -27,13 +27,20 @@ export function ActiveThemeProvider({
 }) {
   const [activeTheme, setActiveTheme] = useState(initialTheme || DEFAULT_THEME);
 
+  function changeActiveTheme(theme: string) {
+    if (!THEMES.some((item) => item.value === theme)) return;
+    setActiveTheme(theme);
+    document.documentElement.setAttribute("data-theme", theme);
+    setThemeCookie(theme);
+  }
+
   useEffect(() => {
     setThemeCookie(activeTheme);
     document.documentElement.setAttribute("data-theme", activeTheme);
   }, [activeTheme]);
 
   return (
-    <ThemeContext.Provider value={{ activeTheme, setActiveTheme }}>
+    <ThemeContext.Provider value={{ activeTheme, setActiveTheme: changeActiveTheme }}>
       {children}
     </ThemeContext.Provider>
   );
