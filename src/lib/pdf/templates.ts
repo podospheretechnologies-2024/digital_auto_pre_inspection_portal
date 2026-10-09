@@ -121,7 +121,7 @@ function sections2w(data: PdfDocumentData): PdfSection[] {
     caseDetails(data),
     vehicleTitle(data),
     {
-      heading: "VEHICLE DETAILS",
+      heading: "",
       columns: 4,
       fields: [
         field("Vehicle NO", "vehicleno", p),

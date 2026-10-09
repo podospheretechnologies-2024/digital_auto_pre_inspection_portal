@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { requireBothUser, zodErrorResponse } from "@/lib/api";
+import { requireBothWithPermission, zodErrorResponse } from "@/lib/api";
+import { canAccessJob } from "@/lib/jobs/access";
+import { jobActionError } from "@/lib/jobs/http";
 import { workflowActionSchema } from "@/lib/jobs/schemas";
-import { applyWorkflowAction } from "@/lib/services/job-assignment";
+import { applyWorkflowAction, getJobById } from "@/lib/services/job-assignment";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -10,9 +12,6 @@ type RouteContext = {
 
 /** POST /api/v2/jobs/[id]/workflow — { action: hold|resume|cancel|restore } */
 export async function POST(request: Request, context: RouteContext) {
-  const user = await requireBothUser();
-  if (user instanceof NextResponse) return user;
-
   const { id: idParam } = await context.params;
   const jobId = Number(idParam);
   if (!Number.isFinite(jobId) || jobId <= 0) {
@@ -23,6 +22,23 @@ export async function POST(request: Request, context: RouteContext) {
   const parsed = workflowActionSchema.safeParse(body);
   if (!parsed.success) return zodErrorResponse(parsed.error);
 
+  const permission =
+    parsed.data.action === "hold" || parsed.data.action === "resume"
+      ? "hold_edit"
+      : parsed.data.action === "restore"
+        ? "cancel_edit"
+        : "cancel_delete";
+  const user = await requireBothWithPermission(permission);
+  if (user instanceof NextResponse) return user;
+
+  const existing = await getJobById(jobId);
+  if (!existing) {
+    return NextResponse.json({ message: "Not found" }, { status: 404 });
+  }
+  if (!(await canAccessJob(user, existing))) {
+    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  }
+
   try {
     const data = await applyWorkflowAction(
       jobId,
@@ -31,16 +47,6 @@ export async function POST(request: Request, context: RouteContext) {
     );
     return NextResponse.json({ data, ok: true });
   } catch (error) {
-    if (error instanceof Error && error.message === "NOT_FOUND") {
-      return NextResponse.json({ message: "Not found" }, { status: 404 });
-    }
-    if (error instanceof Error && error.message === "CANCELLED") {
-      return NextResponse.json(
-        { message: "Job is cancelled — restore first" },
-        { status: 422 },
-      );
-    }
-    console.error("[api/v2/jobs/workflow]", error);
-    return NextResponse.json({ message: "Workflow action failed" }, { status: 500 });
+    return jobActionError(error, "[api/v2/jobs/workflow]");
   }
 }

@@ -328,6 +328,21 @@ export async function handleStoreVahanDetails(
 export async function handleDeleteRcHistoryData(
   body: Record<string, unknown>,
 ): Promise<NextResponse> {
+  const accessToken =
+    typeof body.access_token === "string" ? body.access_token.trim() : "";
+  if (!isInternalRcUpdateToken(accessToken)) {
+    return NextResponse.json(
+      { success: 0, message: "Access denied." },
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      },
+    );
+  }
+
   const result = await deleteRcHistoryData({
     rc_regn_no: String(body.rc_regn_no ?? ""),
     rc_history: String(body.rc_history ?? ""),

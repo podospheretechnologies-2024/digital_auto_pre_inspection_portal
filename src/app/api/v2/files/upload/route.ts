@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 
-import { auth } from "@/auth";
+import { requireSessionUser } from "@/lib/api";
 import {
   canStoreFiles,
   isLocalUploadConfigured,
   isStorageConfigured,
   uploadFile,
   uploadJobImage,
+  uploadJobVideo,
   uploadPdf,
 } from "@/lib/services/files";
 
@@ -58,6 +59,9 @@ export async function POST(request: Request) {
       stored = await uploadFile(explicitKey.trim(), bytes, contentType);
     } else if (folder === "pdfs" || contentType === "application/pdf") {
       stored = await uploadPdf(file.name || `pi-${Date.now()}.pdf`, bytes);
+    } else if (folder === "upload_videos" || contentType.startsWith("video/")) {
+      const name = file.name || `pi-${Date.now()}.mp4`;
+      stored = await uploadJobVideo(name, bytes, contentType);
     } else {
       const name =
         file.name ||
@@ -65,19 +69,19 @@ export async function POST(request: Request) {
       stored = await uploadJobImage(name, bytes, contentType);
     }
 
+    const mediaUrl = new URL("/api/v2/files/media", request.url);
+    mediaUrl.searchParams.set("key", stored.key);
     return NextResponse.json({
       phase: 6,
       scope: "pre-inspection",
-      stored,
+      stored: { ...stored, url: mediaUrl.toString() },
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: "Upload failed", message }, { status: 500 });
   }
-}
-
-export async function GET() {
-  const session = await auth();
+  const user = await requireSessionUser();
+  if (user instanceof NextResponse) return user;
   if (!session?.user) {
     return NextResponse.json({ authenticated: false }, { status: 401 });
   }

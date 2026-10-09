@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { toast as notice } from "@/lib/toast";
 
 import { StatusPill } from "@/components/atlas/status-pill";
 import { PageHeader } from "@/components/layout/page-header";
@@ -75,6 +76,10 @@ const emptyForm = {
   password_confirmation: "",
 };
 
+/** Theme-aware <select> styling (works in both light and dark mode) */
+const selectClass =
+  "flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 [color-scheme:light] dark:[color-scheme:dark]";
+
 async function apiJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     ...init,
@@ -133,6 +138,11 @@ export function PeopleCrudPage({
     name: string;
     next: "Active" | "Inactive";
   } | null>(null);
+  const [approveTarget, setApproveTarget] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
+  const [confirmSave, setConfirmSave] = useState(false);
   const canResetPassword = Boolean(showResetPassword || defaultRole === "HO");
   const isHoStaff = defaultRole === "HO";
   /** Hide empty Parent RO column on HO Staff only */
@@ -215,7 +225,7 @@ export function PeopleCrudPage({
     },
     onSuccess: async (res) => {
       const msg = (res as { message?: string })?.message;
-      toast.success(
+      notice.success(
         editingId
           ? "Updated"
           : msg ||
@@ -238,7 +248,7 @@ export function PeopleCrudPage({
         body: JSON.stringify({ id }),
       }),
     onSuccess: async () => {
-      toast.success("Deleted");
+      notice.success("Deleted");
       await queryClient.invalidateQueries({ queryKey: [queryKey] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -284,7 +294,7 @@ export function PeopleCrudPage({
         body: JSON.stringify(input),
       }),
     onSuccess: async (_res, vars) => {
-      toast.success(
+      notice.success(
         vars.status === "Inactive" ? "Deactivated" : "Activated",
       );
       await queryClient.invalidateQueries({ queryKey: [queryKey] });
@@ -321,9 +331,9 @@ export function PeopleCrudPage({
           {(listQuery.error as Error).message}
         </p>
       ) : (
-        <div className="rounded-xl border bg-card">
+        <div className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm">
           <Table>
-            <TableHeader>
+            <TableHeader className="bg-muted/40">
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
@@ -389,7 +399,12 @@ export function PeopleCrudPage({
                           icon={CheckCircle2}
                           label="Approve"
                           disabled={approveMutation.isPending}
-                          onClick={() => approveMutation.mutate(row.id)}
+                          onClick={() =>
+                            setApproveTarget({
+                              id: row.id,
+                              name: `${row.first_name} ${row.last_name}`.trim(),
+                            })
+                          }
                         />
                       ) : null}
                       <CrudActionButton
@@ -516,7 +531,7 @@ export function PeopleCrudPage({
             <div className="space-y-1.5">
               <Label>City</Label>
               <select
-                className="flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm"
+                className={selectClass}
                 value={form.city}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, city: e.target.value }))
@@ -534,7 +549,7 @@ export function PeopleCrudPage({
               <div className="space-y-1.5 sm:col-span-2">
                 <Label>Role</Label>
                 <select
-                  className="flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm"
+                  className={selectClass}
                   value={form.role || defaultRole}
                   onChange={(e) =>
                     setForm((f) => ({
@@ -557,7 +572,7 @@ export function PeopleCrudPage({
               <div className="space-y-1.5 sm:col-span-2">
                 <Label>Parent RO</Label>
                 <select
-                  className="flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm"
+                  className={selectClass}
                   value={form.parent_id}
                   onChange={(e) =>
                     setForm((f) => ({ ...f, parent_id: e.target.value }))
@@ -571,7 +586,7 @@ export function PeopleCrudPage({
                   ))}
                 </select>
                 {ros.length === 0 ? (
-                  <p className="text-xs text-amber-700">
+                  <p className="text-xs text-amber-700 dark:text-amber-400">
                     No verified RO found. Create and Approve an RO first.
                   </p>
                 ) : null}
@@ -616,7 +631,7 @@ export function PeopleCrudPage({
             </Button>
             <Button
               disabled={!canSubmit}
-              onClick={() => saveMutation.mutate()}
+              onClick={() => setConfirmSave(true)}
             >
               {saveMutation.isPending ? "Saving…" : "Save"}
             </Button>
@@ -674,6 +689,42 @@ export function PeopleCrudPage({
       </Dialog>
 
       <ConfirmDialog
+        open={confirmSave}
+        onOpenChange={setConfirmSave}
+        title={editingId ? "Save these changes?" : "Save this user?"}
+        description="The record will be saved after you confirm."
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
+        loading={saveMutation.isPending}
+        onConfirm={() => {
+          setConfirmSave(false);
+          saveMutation.mutate();
+        }}
+      />
+
+      <ConfirmDialog
+        open={approveTarget != null}
+        onOpenChange={(open) => {
+          if (!open) setApproveTarget(null);
+        }}
+        tone="default"
+        title="Approve user?"
+        description={
+          approveTarget
+            ? `“${approveTarget.name}” will be approved and can log in.`
+            : undefined
+        }
+        confirmLabel="Approve"
+        loading={approveMutation.isPending}
+        onConfirm={() => {
+          if (!approveTarget) return;
+          approveMutation.mutate(approveTarget.id, {
+            onSettled: () => setApproveTarget(null),
+          });
+        }}
+      />
+
+      <ConfirmDialog
         open={deactivateTarget != null}
         onOpenChange={(open) => {
           if (!open) setDeactivateTarget(null);
@@ -691,9 +742,8 @@ export function PeopleCrudPage({
               : `“${deactivateTarget.name}” will be activated and can log in again (if verified).`
             : undefined
         }
-        confirmLabel={
-          deactivateTarget?.next === "Inactive" ? "Deactivate" : "Activate"
-        }
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
         loading={statusMutation.isPending}
         onConfirm={() => {
           if (!deactivateTarget) return;
@@ -716,7 +766,8 @@ export function PeopleCrudPage({
             ? `“${deleteTarget.name}” will be removed. This cannot be undone.`
             : undefined
         }
-        confirmLabel="Delete"
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
         loading={deleteMutation.isPending}
         onConfirm={() => {
           if (!deleteTarget) return;

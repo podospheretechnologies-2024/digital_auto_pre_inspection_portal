@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import type { WheelKind } from "@/lib/jobs/helpers";
 import type { QcSubmitInput } from "@/lib/jobs/schemas";
-import { logJobHistory } from "@/lib/services/job-history";
+import { logJobHistory, latestChangeStageReasons } from "@/lib/services/job-history";
 import type { SessionUser } from "@/types/next-auth";
 
 export type QcQueueItem = {
@@ -34,6 +34,7 @@ export type QcQueueItem = {
   model: string;
   variant: string;
   agent_name: string;
+  stage_reason: string | null;
 };
 
 async function enrichQcRows(
@@ -62,7 +63,8 @@ async function enrichQcRows(
   });
   const jobMap = new Map(jobs.map((j) => [j.id, j]));
 
-  const [banks, companies, models, variants, agents] = await Promise.all([
+  const [banks, companies, models, variants, agents, stageReasons] =
+    await Promise.all([
     db.m_bank.findMany(),
     db.m_company.findMany(),
     db.m_model.findMany(),
@@ -70,6 +72,7 @@ async function enrichQcRows(
     db.users.findMany({
       select: { id: true, first_name: true, last_name: true },
     }),
+    latestChangeStageReasons(jobIds),
   ]);
 
   const bankMap = new Map(banks.map((b) => [b.id, b.name]));
@@ -118,6 +121,7 @@ async function enrichQcRows(
         model: job.model_id ? (modelMap.get(job.model_id) ?? "—") : "—",
         variant: job.variant_id ? (variantMap.get(job.variant_id) ?? "—") : "—",
         agent_name: job.agent_id ? (agentMap.get(job.agent_id) ?? "—") : "—",
+        stage_reason: row.job_id ? (stageReasons.get(row.job_id) ?? null) : null,
       };
     });
 }
@@ -267,6 +271,27 @@ export async function getQcByJobId(jobId: number, kind: WheelKind) {
 
 /** Mark QC done — Laravel updateremark{2,3,4}wqc. */
 export async function submitQc(user: SessionUser, input: QcSubmitInput) {
+  const current =
+    input.vehicle_type === "2wheeler"
+      ? await db.tbl_2wheeler.findUnique({ where: { id: input.inspection_id } })
+      : input.vehicle_type === "3wheeler"
+        ? await db.tbl_3wheeler.findUnique({
+            where: { id: input.inspection_id },
+          })
+        : await db.tbl_4wheeler.findUnique({
+            where: { id: input.inspection_id },
+          });
+
+  if (!current?.job_id) throw new Error("NOT_FOUND");
+  if (Number(current.qc ?? 0) === 1) throw new Error("INVALID_TRANSITION");
+
+  const job = await db.tbl_jobs.findFirst({
+    where: { id: current.job_id },
+    select: { is_deleted: true, on_hold: true },
+  });
+  if (!job || job.is_deleted === 1) throw new Error("CANCELLED");
+  if (job.on_hold === 1) throw new Error("INVALID_TRANSITION");
+
   const now = new Date();
   const data = {
     remarks: input.remarks,
@@ -278,34 +303,26 @@ export async function submitQc(user: SessionUser, input: QcSubmitInput) {
     updated_at: now,
   };
 
-  const updated =
+  const where = { id: input.inspection_id, qc: current.qc };
+  const result =
     input.vehicle_type === "2wheeler"
-      ? await db.tbl_2wheeler.update({
-          where: { id: input.inspection_id },
-          data,
-        })
+      ? await db.tbl_2wheeler.updateMany({ where, data })
       : input.vehicle_type === "3wheeler"
-        ? await db.tbl_3wheeler.update({
-            where: { id: input.inspection_id },
-            data,
-          })
-        : await db.tbl_4wheeler.update({
-            where: { id: input.inspection_id },
-            data,
-          });
+        ? await db.tbl_3wheeler.updateMany({ where, data })
+        : await db.tbl_4wheeler.updateMany({ where, data });
 
-  if (updated.job_id != null) {
-    await logJobHistory({
-      jobId: updated.job_id,
-      userId: Number(user.id),
-      event: "Quality Check",
-      remark: input.remarks?.trim()
-        ? input.remarks.trim()
-        : "Quality check completed for this case",
-    });
-  }
+  if (result.count !== 1) throw new Error("CONFLICT");
 
-  return updated;
+  await logJobHistory({
+    jobId: current.job_id,
+    userId: Number(user.id),
+    event: "Quality Check",
+    remark: input.remarks?.trim()
+      ? input.remarks.trim()
+      : "Quality check completed for this case",
+  });
+
+  return { ...current, ...data, job_id: current.job_id };
 }
 
 /** Done lists (qc = 1) for reports / admin review. */

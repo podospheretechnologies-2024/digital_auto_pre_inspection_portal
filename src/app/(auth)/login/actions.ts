@@ -43,6 +43,16 @@ export async function loginAction(
   } catch (error) {
     if (error instanceof AuthError) {
       if (error.type === "CredentialsSignin") {
+        const code =
+          (error as { code?: string }).code ??
+          (error.cause as { code?: string; err?: { code?: string } } | undefined)
+            ?.code ??
+          (error.cause as { err?: { code?: string } } | undefined)?.err?.code;
+        if (code === "rate_limit") {
+          return {
+            error: "Too many login attempts. Try again in 15 minutes.",
+          };
+        }
         return {
           error:
             "Invalid email or password — or account pending HO approval.",

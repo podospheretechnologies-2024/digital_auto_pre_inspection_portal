@@ -19,7 +19,11 @@ import {
   JobsTableHead,
   JobsTableHeader,
   JobsTableRow,
+  SheetDateTime,
+  SheetPager,
+  SheetPerson,
   TableBody,
+  useSheetPage,
 } from "@/components/jobs/jobs-listing";
 import { JobsNav } from "@/components/jobs/jobs-nav";
 import { PageHeader } from "@/components/layout/page-header";
@@ -35,6 +39,7 @@ type JobRow = {
   vehicleno: string | null;
   dti_no: string | null;
   cname: string | null;
+  mobileno: string | null;
   bankname?: string;
   agent_name?: string;
   created_at: string | null;
@@ -49,7 +54,7 @@ export function JobsListPage() {
     queryFn: async () => {
       const params = new URLSearchParams({ list: "all", limit: "100" });
       if (search) params.set("q", search);
-      const res = await fetch(`/api/v2/jobs?${params}`);
+      const res = await fetch(`/api/v2/jobs?${params}`, { cache: "no-store" });
       const json = await res.json();
       if (!res.ok) throw new Error(json.message || "Failed to load jobs");
       return (json.data ?? []) as JobRow[];
@@ -57,6 +62,7 @@ export function JobsListPage() {
   });
 
   const rows = listQuery.data ?? [];
+  const sheet = useSheetPage(rows);
 
   return (
     <>
@@ -71,6 +77,7 @@ export function JobsListPage() {
         title="All jobs"
         description="Search by DTI, vehicle, customer or bank reference"
         count={rows.length}
+        mark="all"
         loading={listQuery.isLoading}
         error={
           listQuery.isError ? (listQuery.error as Error).message : null
@@ -93,6 +100,15 @@ export function JobsListPage() {
             <JobActionButton type="submit" tone="outline" icon={Search} label="Search" />
           </form>
         }
+        footer={
+          rows.length > 0 ? (
+            <SheetPager
+              page={sheet.page}
+              pageCount={sheet.pageCount}
+              onPage={sheet.setPage}
+            />
+          ) : null
+        }
       >
         {rows.length > 0 ? (
           <JobsTable>
@@ -102,6 +118,7 @@ export function JobsListPage() {
                 <JobsTableHead>ID</JobsTableHead>
                 <JobsTableHead>DTI</JobsTableHead>
                 <JobsTableHead>Customer</JobsTableHead>
+                <JobsTableHead>Date</JobsTableHead>
                 <JobsTableHead>Vehicle</JobsTableHead>
                 <JobsTableHead>Type</JobsTableHead>
                 <JobsTableHead>Bank</JobsTableHead>
@@ -111,22 +128,20 @@ export function JobsListPage() {
               </JobsTableRow>
             </JobsTableHeader>
             <TableBody>
-              {rows.map((job, index) => {
+              {sheet.pageItems.map((job, index) => {
                 const pill = jobStatusPill(job.status);
                 return (
                   <JobsTableRow key={job.id}>
-                    <JobSerialCell index={index} />
-                    <JobsTableCell className="font-mono text-[12px] text-muted-foreground">
-                      #{job.id}
-                    </JobsTableCell>
+                    <JobSerialCell index={sheet.start + index} />
+                    <JobsTableCell>#{job.id}</JobsTableCell>
                     <JobsTableCell>
                       <JobDtiCell value={job.dti_no} />
                     </JobsTableCell>
-                    <JobsTableCell
-                      className="max-w-[160px] truncate font-medium"
-                      title={job.cname ?? undefined}
-                    >
-                      {job.cname ?? "—"}
+                    <JobsTableCell>
+                      <SheetPerson name={job.cname} phone={job.mobileno} />
+                    </JobsTableCell>
+                    <JobsTableCell>
+                      <SheetDateTime value={job.created_at} />
                     </JobsTableCell>
                     <JobsTableCell>
                       <RegPlate value={job.vehicleno} />

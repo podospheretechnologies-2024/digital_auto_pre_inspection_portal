@@ -12,7 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const selectClass = cn(
-  "h-9 min-w-[8.5rem] rounded-md border border-input bg-background px-2.5 text-[12.5px] text-foreground outline-none",
+  "h-9 min-w-[8.5rem] rounded-lg border border-input bg-background px-2.5 text-[12.5px] text-foreground shadow-none outline-none",
   "focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20",
 );
 
@@ -48,7 +48,7 @@ export function CaseListToolbar({
   return (
     <div
       className={cn(
-        "border-b border-border/70 bg-muted/10 px-3 py-3 sm:px-4",
+        "border-b border-border/70 bg-muted/20 px-3 py-3 sm:px-4",
         className,
       )}
     >

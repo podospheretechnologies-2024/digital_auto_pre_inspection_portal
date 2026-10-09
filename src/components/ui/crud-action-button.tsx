@@ -3,6 +3,10 @@
 import type { LucideIcon } from "lucide-react";
 import type { ComponentProps } from "react";
 
+import {
+  ActionOverflow,
+  useInActionMenu,
+} from "@/components/ui/action-overflow";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -19,18 +23,22 @@ export type CrudActionTone =
   | "activate"
   | "delete";
 
+const toneIconClass: Record<CrudActionTone, string> = {
+  approve: "bg-emerald-600",
+  edit: "bg-violet-600",
+  password: "bg-indigo-600",
+  deactivate: "bg-amber-500",
+  activate: "bg-lime-600",
+  delete: "bg-red-600",
+};
+
 const toneClass: Record<CrudActionTone, string> = {
-  approve:
-    "border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100 hover:text-emerald-800",
-  edit: "border-violet-200 bg-violet-50 text-violet-700 hover:border-violet-300 hover:bg-violet-100 hover:text-violet-800",
-  password:
-    "border-sky-200 bg-sky-50 text-sky-700 hover:border-sky-300 hover:bg-sky-100 hover:text-sky-800",
-  deactivate:
-    "border-amber-200 bg-amber-50 text-amber-800 hover:border-amber-300 hover:bg-amber-100 hover:text-amber-900",
-  activate:
-    "border-teal-200 bg-teal-50 text-teal-700 hover:border-teal-300 hover:bg-teal-100 hover:text-teal-800",
-  delete:
-    "border-red-200 bg-red-50 text-red-700 hover:border-red-300 hover:bg-red-100 hover:text-red-800",
+  approve: "border-transparent bg-emerald-600 text-white hover:bg-emerald-700",
+  edit: "border-transparent bg-violet-600 text-white hover:bg-violet-700",
+  password: "border-transparent bg-indigo-600 text-white hover:bg-indigo-700",
+  deactivate: "border-transparent bg-amber-500 text-white hover:bg-amber-600",
+  activate: "border-transparent bg-lime-600 text-white hover:bg-lime-700",
+  delete: "border-transparent bg-red-600 text-white hover:bg-red-700",
 };
 
 type CrudActionButtonProps = Omit<
@@ -49,6 +57,30 @@ export function CrudActionButton({
   className,
   ...props
 }: CrudActionButtonProps) {
+  const inMenu = useInActionMenu();
+  if (inMenu) {
+    return (
+      <Button
+        variant="ghost"
+        aria-label={label}
+        className={cn(
+          "inline-flex h-9 w-full shrink-0 items-center justify-start gap-2 rounded-lg border-0 bg-transparent px-2 text-left text-[13px] font-medium text-foreground shadow-none hover:bg-muted",
+          className,
+        )}
+        {...props}
+      >
+        <span
+          className={cn(
+            "inline-flex size-7 shrink-0 items-center justify-center rounded-md text-white",
+            toneIconClass[tone],
+          )}
+        >
+          <Icon className="size-3.5 shrink-0" strokeWidth={2.25} />
+        </span>
+        <span className="truncate">{label}</span>
+      </Button>
+    );
+  }
   return (
     <Tooltip>
       <TooltipTrigger
@@ -77,9 +109,5 @@ export function CrudActionButton({
 }
 
 export function CrudActionGroup({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="inline-flex flex-nowrap items-center justify-end gap-1.5">
-      {children}
-    </div>
-  );
+  return <ActionOverflow>{children}</ActionOverflow>;
 }

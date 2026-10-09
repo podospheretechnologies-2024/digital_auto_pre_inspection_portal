@@ -60,22 +60,42 @@ export function PageHeader({
 }) {
   const pathname = usePathname();
   const Icon = icon ?? iconForPath(pathname);
+  const workspace =
+    pathname.startsWith("/jobs/assign") ||
+    pathname.startsWith("/jobs/fresh") ||
+    pathname.startsWith("/jobs/schedule") ||
+    pathname.startsWith("/jobs/qc") ||
+    pathname.startsWith("/jobs/hold") ||
+    pathname.startsWith("/jobs/complete") ||
+    pathname.startsWith("/jobs/cancel") ||
+    pathname.startsWith("/jobs/reports") ||
+    pathname.startsWith("/masters") ||
+    pathname.startsWith("/account");
 
   return (
     <header
       className={cn(
-        "relative mb-4 overflow-hidden rounded-lg border border-border/70",
-        "bg-[color-mix(in_oklab,var(--background)_90%,var(--primary)_10%)]",
+        "relative mb-4 overflow-hidden border border-border/70",
+        workspace
+          ? "rounded-xl bg-[color-mix(in_oklab,var(--background)_86%,var(--primary)_14%)] shadow-sm"
+          : "rounded-lg bg-[color-mix(in_oklab,var(--background)_90%,var(--primary)_10%)]",
       )}
     >
       <span aria-hidden className="absolute inset-y-0 left-0 w-0.5 bg-primary" />
 
-      <div className="relative flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 pl-5 sm:px-5">
+      <div
+        className={cn(
+          "relative flex flex-wrap items-center justify-between gap-3 px-4 pl-5 sm:px-5",
+          workspace ? "py-3" : "py-2.5",
+        )}
+      >
         <div className="flex min-w-0 items-center gap-3">
           <span
             className={cn(
-              "flex size-8 shrink-0 items-center justify-center rounded-lg",
-              "border border-border/60 bg-background text-primary",
+              "flex shrink-0 items-center justify-center rounded-lg text-primary",
+              workspace
+                ? "size-9 bg-primary/10"
+                : "size-8 border border-border/60 bg-background",
             )}
           >
             <Icon className="size-4" strokeWidth={1.75} />

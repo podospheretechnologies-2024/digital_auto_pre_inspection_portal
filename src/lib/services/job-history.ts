@@ -18,9 +18,9 @@ function formatUserRole(
   type: string | null | undefined,
   isAdmin: number | null | undefined,
 ): string | null {
-  if (Number(isAdmin ?? 0) === 1) return "Admin";
   const t = (type ?? "").trim();
-  if (!t) return null;
+  if (t === "HO" || t === "RO" || t === "Surveyor" || t === "Bank") return t;
+  if (Number(isAdmin ?? 0) === 1 || !t) return "Admin";
   return t;
 }
 
@@ -54,6 +54,37 @@ export async function logJobHistory(input: {
     );
   } catch (error) {
     console.warn("[job-history] log skipped:", error);
+  }
+}
+
+export async function latestChangeStageReasons(
+  jobIds: number[],
+): Promise<Map<number, string>> {
+  const ids = [...new Set(jobIds.filter((id) => Number.isFinite(id) && id > 0))];
+  if (ids.length === 0) return new Map();
+  try {
+    const rows = await db.$queryRaw<
+      Array<{ job_id: number; remark: string | null }>
+    >(Prisma.sql`
+      SELECT h.job_id, h.remark
+      FROM history_pre_inspection_modules h
+      INNER JOIN (
+        SELECT job_id, MAX(id) AS max_id
+        FROM history_pre_inspection_modules
+        WHERE event = 'Change Stage'
+          AND job_id IN (${Prisma.join(ids)})
+        GROUP BY job_id
+      ) latest ON latest.max_id = h.id
+    `);
+    const map = new Map<number, string>();
+    for (const row of rows) {
+      const text = row.remark?.trim();
+      if (row.job_id != null && text) map.set(Number(row.job_id), text);
+    }
+    return map;
+  } catch (error) {
+    console.warn("[job-history] stage reasons skipped:", error);
+    return new Map();
   }
 }
 

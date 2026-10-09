@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { toast as notice } from "@/lib/toast";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -68,6 +69,7 @@ export function VariantsMasterPage() {
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [name, setName] = useState("");
+  const [confirmSave, setConfirmSave] = useState(false);
   const [companyId, setCompanyId] = useState("");
   const [modelId, setModelId] = useState("");
   const [vehicleType, setVehicleType] = useState<(typeof vehicleTypes)[number]>(
@@ -129,7 +131,7 @@ export function VariantsMasterPage() {
       });
     },
     onSuccess: async () => {
-      toast.success(editingId ? "Variant updated" : "Variant created");
+      notice.success(editingId ? "Variant updated" : "Variant created");
       setOpen(false);
       await queryClient.invalidateQueries({ queryKey: ["masters-variants"] });
     },
@@ -143,7 +145,7 @@ export function VariantsMasterPage() {
         body: JSON.stringify({ id }),
       }),
     onSuccess: async () => {
-      toast.success("Variant deleted");
+      notice.success("Variant deleted");
       await queryClient.invalidateQueries({ queryKey: ["masters-variants"] });
     },
     onError: (error: Error) => toast.error(error.message),
@@ -170,7 +172,7 @@ export function VariantsMasterPage() {
         }
       />
 
-      <Card>
+      <Card className="overflow-hidden rounded-2xl border-border/70 shadow-sm">
         <CardHeader>
           <CardTitle>Variant list</CardTitle>
           <CardDescription>Includes vehicle type</CardDescription>
@@ -316,13 +318,27 @@ export function VariantsMasterPage() {
                 !modelId ||
                 saveMutation.isPending
               }
-              onClick={() => saveMutation.mutate()}
+              onClick={() => setConfirmSave(true)}
             >
               {saveMutation.isPending ? "Saving…" : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={confirmSave}
+        onOpenChange={setConfirmSave}
+        title={editingId ? "Save this variant?" : "Save new variant?"}
+        description="The record will be saved after you confirm."
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
+        loading={saveMutation.isPending}
+        onConfirm={() => {
+          setConfirmSave(false);
+          saveMutation.mutate();
+        }}
+      />
 
       <ConfirmDialog
         open={deleteTarget != null}
@@ -336,7 +352,8 @@ export function VariantsMasterPage() {
             ? `“${deleteTarget.name}” will be removed. This cannot be undone.`
             : undefined
         }
-        confirmLabel="Delete"
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
         loading={deleteMutation.isPending}
         onConfirm={() => {
           if (!deleteTarget) return;

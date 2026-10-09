@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { toast as notice } from "@/lib/toast";
 
 import {
   InspectionMediaUpload,
@@ -30,6 +31,7 @@ import {
   resolveWheelKind,
   type WheelKind,
 } from "@/lib/jobs/helpers";
+import { refreshJobSheets } from "@/lib/jobs/refresh-sheets";
 
 export type VehicleInspectionMode = "create" | "edit" | "view" | "qc";
 
@@ -139,6 +141,7 @@ export function VehicleInspectionForm({
   const router = useRouter();
   const queryClient = useQueryClient();
   const [core, setCore] = useState(CORE_DEFAULTS);
+  const [fieldError, setFieldError] = useState<string | null>(null);
   const [conditions, setConditions] = useState<Record<string, string>>({});
   const [inspectionId, setInspectionId] = useState<number | null>(null);
   const [chassisphoto, setChassisphoto] = useState("");
@@ -320,13 +323,9 @@ export function VehicleInspectionForm({
 
   const saveMutation = useMutation({
     mutationFn: () => persistInspection(false),
-    onSuccess: (res) => {
-      toast.success(
-        skipQc
-          ? "Inspection saved (QC skipped)"
-          : inspectionId
-            ? "Inspection updated"
-            : "Inspection saved",
+    onSuccess: async (res) => {
+      notice.success(
+        skipQc ? "Inspection saved (QC skipped)" : "Inspection saved",
       );
       if (res?.data?.id) setInspectionId(res.data.id);
       setNewPhotos([]);
@@ -338,14 +337,12 @@ export function VehicleInspectionForm({
 
   const sendToCompletedMutation = useMutation({
     mutationFn: () => persistInspection(true),
-    onSuccess: (res) => {
-      toast.success("Sent to Completed");
+    onSuccess: async (res) => {
       if (res?.data?.id) setInspectionId(res.data.id);
       setNewPhotos([]);
       void queryClient.invalidateQueries({ queryKey: ["inspection", jobId] });
-      void queryClient.invalidateQueries({ queryKey: ["jobs"] });
-      void queryClient.invalidateQueries({ queryKey: ["jobs-complete"] });
-      void queryClient.invalidateQueries({ queryKey: ["jobs-qc"] });
+      notice.success("Sent to Completed");
+      await refreshJobSheets(queryClient);
       router.push("/jobs/complete");
     },
     onError: (e: Error) => toast.error(e.message),
@@ -416,6 +413,46 @@ export function VehicleInspectionForm({
     insurer_broker: brokerNames.length ? brokerNames : undefined,
     ctime: CTIME_OPTIONS,
   };
+
+  function firstMissingField() {
+    for (const [key, label] of coreFields) {
+      if (!String(core[key] ?? "").trim()) return { key: String(key), label };
+    }
+    if (!core.remarks.trim()) return { key: "remarks", label: "Remarks" };
+    if (skipQc) {
+      if (!core.ctime.trim()) {
+        return { key: "ctime", label: "Submit time (AM/PM)" };
+      }
+      if (!core.ownership_name.trim()) {
+        return { key: "ownership_name", label: "Ownership name" };
+      }
+      if (!core.valuation_price.trim()) {
+        return { key: "valuation_price", label: "Valuation price" };
+      }
+    }
+    return null;
+  }
+
+  function requireAllFilled() {
+    const missing = firstMissingField();
+    if (!missing) {
+      setFieldError(null);
+      return true;
+    }
+    setFieldError(missing.key);
+    document.getElementById(`core-${missing.key}`)?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+    return false;
+  }
+
+  function fieldNote(key: string, label: string) {
+    if (fieldError !== key) return null;
+    return (
+      <p className="text-[11px] font-medium text-red-600">Fill {label}</p>
+    );
+  }
 
   return (
     <>
@@ -501,12 +538,12 @@ export function VehicleInspectionForm({
                         ? [core.year_of_manufacture, ...options]
                         : options;
                   return (
-                    <div key={key} className="space-y-1.5">
+                    <div key={key} id={`core-${key}`} className="scroll-mt-24 space-y-1.5">
                       <Label>{label}</Label>
                       {selectOptions ? (
                         <select
                           disabled={readOnly}
-                          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+                          className={`flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 ${fieldError === key ? "border-red-500" : "border-input"}`}
                           value={core[key]}
                           onChange={(e) =>
                             setCore((c) => ({ ...c, [key]: e.target.value }))
@@ -523,21 +560,23 @@ export function VehicleInspectionForm({
                         <Input
                           disabled={readOnly}
                           value={core[key]}
+                          className={fieldError === key ? "border-red-500" : undefined}
                           onChange={(e) =>
                             setCore((c) => ({ ...c, [key]: e.target.value }))
                           }
                         />
                       )}
+                      {fieldNote(key, label)}
                     </div>
                   );
                 })}
                 {skipQc ? (
                   <>
-                    <div className="space-y-1.5">
+                    <div id="core-ctime" className="scroll-mt-24 space-y-1.5">
                       <Label>Submit time (AM/PM)</Label>
                       <select
                         disabled={readOnly}
-                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+                        className={`flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 ${fieldError === "ctime" ? "border-red-500" : "border-input"}`}
                         value={core.ctime}
                         onChange={(e) =>
                           setCore((c) => ({
@@ -553,12 +592,18 @@ export function VehicleInspectionForm({
                           </option>
                         ))}
                       </select>
+                      {fieldNote("ctime", "Submit time (AM/PM)")}
                     </div>
-                    <div className="space-y-1.5">
+                    <div id="core-ownership_name" className="scroll-mt-24 space-y-1.5">
                       <Label>Ownership name</Label>
                       <Input
                         disabled={readOnly}
                         value={core.ownership_name}
+                        className={
+                          fieldError === "ownership_name"
+                            ? "border-red-500"
+                            : undefined
+                        }
                         onChange={(e) =>
                           setCore((c) => ({
                             ...c,
@@ -566,13 +611,19 @@ export function VehicleInspectionForm({
                           }))
                         }
                       />
+                      {fieldNote("ownership_name", "Ownership name")}
                     </div>
-                    <div className="space-y-1.5">
+                    <div id="core-valuation_price" className="scroll-mt-24 space-y-1.5">
                       <Label>Valuation price</Label>
                       <Input
                         type="number"
                         disabled={readOnly}
                         value={core.valuation_price}
+                        className={
+                          fieldError === "valuation_price"
+                            ? "border-red-500"
+                            : undefined
+                        }
                         onChange={(e) =>
                           setCore((c) => ({
                             ...c,
@@ -580,18 +631,21 @@ export function VehicleInspectionForm({
                           }))
                         }
                       />
+                      {fieldNote("valuation_price", "Valuation price")}
                     </div>
                   </>
                 ) : null}
-                <div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
+                <div id="core-remarks" className="scroll-mt-24 space-y-1.5 sm:col-span-2 lg:col-span-3">
                   <Label>Remarks</Label>
                   <Textarea
                     disabled={readOnly}
                     value={core.remarks}
+                    className={fieldError === "remarks" ? "border-red-500" : undefined}
                     onChange={(e) =>
                       setCore((c) => ({ ...c, remarks: e.target.value }))
                     }
                   />
+                  {fieldNote("remarks", "Remarks")}
                 </div>
               </div>
             </CardContent>
@@ -714,7 +768,10 @@ export function VehicleInspectionForm({
                 disabled={
                   saveMutation.isPending || sendToCompletedMutation.isPending
                 }
-                onClick={() => saveMutation.mutate()}
+                onClick={() => {
+                  if (!requireAllFilled()) return;
+                  saveMutation.mutate();
+                }}
               >
                 {saveMutation.isPending
                   ? "Saving…"
@@ -731,7 +788,10 @@ export function VehicleInspectionForm({
                   disabled={
                     saveMutation.isPending || sendToCompletedMutation.isPending
                   }
-                  onClick={() => sendToCompletedMutation.mutate()}
+                  onClick={() => {
+                    if (!requireAllFilled()) return;
+                    sendToCompletedMutation.mutate();
+                  }}
                 >
                   {sendToCompletedMutation.isPending
                     ? "Sending…"

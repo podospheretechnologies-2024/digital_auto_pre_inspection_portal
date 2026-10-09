@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
 
-import { requireBothUser, requireSessionUser, zodErrorResponse } from "@/lib/api";
+import { denyUnlessPagePermission, requireBothWithPermission, requireSessionUser, zodErrorResponse } from "@/lib/api";
+import { resolveJobScope } from "@/lib/jobs/access";
+import { jobActionError } from "@/lib/jobs/http";
+import { listPagePermission } from "@/lib/route-access";
 import {
   createJobSchema,
   jobListFilterSchema,
 } from "@/lib/jobs/schemas";
 import { createJob, listJobs } from "@/lib/services/job-assignment";
-import { isAll, isBoth } from "@/lib/rbac";
+import { isBoth } from "@/lib/rbac";
 
 /**
  * GET /api/v2/jobs?list=fresh|schedule|pending|all&q=&agent_id=&bank_id=
@@ -26,23 +29,21 @@ export async function GET(request: Request) {
   });
   if (!parsed.success) return zodErrorResponse(parsed.error);
 
-  const filter = { ...parsed.data };
+  const denied = denyUnlessPagePermission(user, listPagePermission(parsed.data.list));
+  if (denied) return denied;
 
-  // Surveyor pending: force agent_id to self
+  const filter = { ...parsed.data };
+  const scope = await resolveJobScope(user);
+
   if (filter.list === "pending") {
-    if (!isAll(user)) {
-      return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-    }
     filter.agent_id = Number(user.id);
-  } else if (!isBoth(user) && filter.list !== "all") {
-    // Non-HO users can only see their pending / assigned
-    if (!isAll(user)) {
-      return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-    }
+  } else if (!isBoth(user)) {
+    filter.agent_id = undefined;
+    filter.bank_id = undefined;
   }
 
   try {
-    const data = await listJobs(filter);
+    const data = await listJobs(filter, scope);
     return NextResponse.json({ data });
   } catch (error) {
     console.error("[api/v2/jobs]", error);
@@ -51,7 +52,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const user = await requireBothUser();
+  const user = await requireBothWithPermission("jobs_entry");
   if (user instanceof NextResponse) return user;
 
   const body = await request.json();
@@ -62,13 +63,6 @@ export async function POST(request: Request) {
     const data = await createJob(user, parsed.data);
     return NextResponse.json({ data }, { status: 201 });
   } catch (error) {
-    console.error("[api/v2/jobs POST]", error);
-    const message =
-      error instanceof Error && /column|does not exist|P2022/i.test(error.message)
-        ? "Create failed (database schema mismatch). Check server logs."
-        : error instanceof Error
-          ? error.message
-          : "Create failed";
-    return NextResponse.json({ message }, { status: 500 });
+    return jobActionError(error, "[api/v2/jobs POST]");
   }
 }

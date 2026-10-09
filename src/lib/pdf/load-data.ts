@@ -5,7 +5,11 @@
  */
 
 import { db } from "@/lib/db";
-import { resolveUploadImageUrl, resolveVideoUrl } from "@/lib/pdf/media-url";
+import {
+  embedStoredImage,
+  pdfMediaHref,
+  resolveVideoUrl,
+} from "@/lib/pdf/media-url";
 import type {
   PdfDocumentData,
   PdfImage,
@@ -140,7 +144,7 @@ async function loadImages(
 
   const images: PdfImage[] = [];
   for (const r of rows) {
-    const url = resolveUploadImageUrl(r.image, r.s3_url);
+    const url = await embedStoredImage(r.image, r.s3_url);
     if (url) images.push({ url, caption: r.image ?? undefined });
   }
   return { images, firstImage: images[0] ?? null };
@@ -232,13 +236,19 @@ export async function loadInspectionPdfData(
     ...masters,
   });
 
-  const videoUrl = resolveVideoUrl(
-    printdata.video as string | null,
-    printdata.s3video_url as string | null,
-  );
+  const videoUrl =
+    pdfMediaHref(
+      (printdata.video as string | null) ||
+        (printdata.s3video_url as string | null),
+      "upload_videos",
+    ) ??
+    resolveVideoUrl(
+      printdata.video as string | null,
+      printdata.s3video_url as string | null,
+    );
   if (videoUrl) printdata.video_url = videoUrl;
 
-  const chassisUrl = resolveUploadImageUrl(
+  const chassisUrl = await embedStoredImage(
     printdata.chassisphoto as string | null,
   );
   if (chassisUrl) printdata.chassisphoto_url = chassisUrl;

@@ -24,10 +24,6 @@ export function ThemeSelector() {
         Theme
       </Label>
       <Select
-        items={THEMES.map((theme) => ({
-          value: theme.value,
-          label: theme.name,
-        }))}
         value={activeTheme}
         onValueChange={(value) => {
           if (value !== null) setActiveTheme(value as string);
@@ -36,7 +32,7 @@ export function ThemeSelector() {
         <SelectTrigger
           id="theme-selector"
           size="sm"
-          className="justify-start *:data-[slot=select-value]:w-20"
+          className="min-w-[9.5rem] justify-start *:data-[slot=select-value]:w-28"
         >
           <Palette className="text-muted-foreground" />
           <SelectValue placeholder="Theme" />

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { requireBothUser, zodErrorResponse } from "@/lib/api";
+import { requireBothWithPermission, zodErrorResponse } from "@/lib/api";
+import { jobActionError } from "@/lib/jobs/http";
 import { resolveWheelKind, type WheelKind } from "@/lib/jobs/helpers";
 import { qcSubmitSchema } from "@/lib/jobs/schemas";
 import { listQcDone, listQcQueue, submitQc } from "@/lib/services/qc";
@@ -10,7 +11,7 @@ import { listQcDone, listQcQueue, submitQc } from "@/lib/services/qc";
  * POST /api/v2/jobs/qc — submit QC
  */
 export async function GET(request: Request) {
-  const user = await requireBothUser();
+  const user = await requireBothWithPermission("qc_view");
   if (user instanceof NextResponse) return user;
 
   const url = new URL(request.url);
@@ -53,7 +54,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const user = await requireBothUser();
+  const user = await requireBothWithPermission("qc_edit");
   if (user instanceof NextResponse) return user;
 
   const body = await request.json();
@@ -64,7 +65,6 @@ export async function POST(request: Request) {
     const data = await submitQc(user, parsed.data);
     return NextResponse.json({ data });
   } catch (error) {
-    console.error("[api/v2/jobs/qc POST]", error);
-    return NextResponse.json({ message: "QC submit failed" }, { status: 500 });
+    return jobActionError(error, "[api/v2/jobs/qc POST]");
   }
 }

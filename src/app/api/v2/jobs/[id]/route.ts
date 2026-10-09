@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { requireBothUser, requireSessionUser, zodErrorResponse } from "@/lib/api";
+import { denyUnlessButtonPermission, denyUnlessPagePermission, requireBothWithPermission, requireSessionUser, zodErrorResponse } from "@/lib/api";
+import { canAccessJob } from "@/lib/jobs/access";
+import { jobActionError } from "@/lib/jobs/http";
 import { updateJobSchema } from "@/lib/jobs/schemas";
 import {
   deleteJob,
@@ -20,6 +22,8 @@ type RouteContext = {
 export async function GET(_request: Request, context: RouteContext) {
   const user = await requireSessionUser();
   if (user instanceof NextResponse) return user;
+  const denied = denyUnlessPagePermission(user, "jobs_view");
+  if (denied) return denied;
 
   const { id: idParam } = await context.params;
   const id = Number(idParam);
@@ -33,6 +37,9 @@ export async function GET(_request: Request, context: RouteContext) {
     if (!data) {
       return NextResponse.json({ message: "Job not found" }, { status: 404 });
     }
+    if (!(await canAccessJob(user, data))) {
+      return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+    }
     return NextResponse.json({ data });
   } catch (error) {
     console.error("[api/v2/jobs/[id]]", error);
@@ -44,7 +51,7 @@ export async function GET(_request: Request, context: RouteContext) {
 }
 
 export async function PUT(request: Request, context: RouteContext) {
-  const user = await requireBothUser();
+  const user = await requireBothWithPermission("jobs_edit");
   if (user instanceof NextResponse) return user;
 
   const { id: idParam } = await context.params;
@@ -57,17 +64,24 @@ export async function PUT(request: Request, context: RouteContext) {
   const parsed = updateJobSchema.safeParse({ ...body, id });
   if (!parsed.success) return zodErrorResponse(parsed.error);
 
+  const existing = await getJobById(id);
+  if (!existing) {
+    return NextResponse.json({ message: "Job not found" }, { status: 404 });
+  }
+  if (!(await canAccessJob(user, existing))) {
+    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  }
+
   try {
-    const data = await updateJob(parsed.data);
+    const data = await updateJob(parsed.data, Number(user.id));
     return NextResponse.json({ data });
   } catch (error) {
-    console.error("[api/v2/jobs/[id] PUT]", error);
-    return NextResponse.json({ message: "Update failed" }, { status: 500 });
+    return jobActionError(error, "[api/v2/jobs/[id] PUT]");
   }
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {
-  const user = await requireBothUser();
+  const user = await requireBothWithPermission("cancel_delete");
   if (user instanceof NextResponse) return user;
 
   const { id: idParam } = await context.params;
@@ -76,11 +90,18 @@ export async function DELETE(_request: Request, context: RouteContext) {
     return NextResponse.json({ message: "Invalid job id" }, { status: 422 });
   }
 
+  const existing = await getJobById(id);
+  if (!existing) {
+    return NextResponse.json({ message: "Not found" }, { status: 404 });
+  }
+  if (!(await canAccessJob(user, existing))) {
+    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  }
+
   try {
-    await deleteJob(id);
+    await deleteJob(id, Number(user.id));
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("[api/v2/jobs/[id] DELETE]", error);
-    return NextResponse.json({ message: "Delete failed" }, { status: 500 });
+    return jobActionError(error, "[api/v2/jobs/[id] DELETE]");
   }
 }

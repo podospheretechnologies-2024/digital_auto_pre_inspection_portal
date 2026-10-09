@@ -3,11 +3,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { RotateCcw } from "lucide-react";
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
+import { refreshJobSheets } from "@/lib/jobs/refresh-sheets";
+import { toast } from "@/lib/toast";
 
 import { RegPlate } from "@/components/atlas/reg-plate";
 import { CaseListToolbar } from "@/components/jobs/case-list-toolbar";
 import { JobHistoryButton } from "@/components/jobs/job-history-button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   JobActionButton,
   JobActions,
@@ -20,7 +22,12 @@ import {
   JobsTableHead,
   JobsTableHeader,
   JobsTableRow,
+  SheetBank,
+  SheetDateTime,
+  SheetPager,
+  SheetPerson,
   TableBody,
+  useSheetPage,
 } from "@/components/jobs/jobs-listing";
 import { PageHeader } from "@/components/layout/page-header";
 import {
@@ -29,7 +36,6 @@ import {
   uniqueSorted,
   type CaseListFilterState,
 } from "@/lib/jobs/case-list-filters";
-import { formatDeskDate } from "@/lib/jobs/helpers";
 
 type Row = {
   id: number;
@@ -60,11 +66,14 @@ async function apiJson<T>(url: string, init?: RequestInit): Promise<T> {
 
 export function CancelCasesPage() {
   const queryClient = useQueryClient();
+  const [restoreId, setRestoreId] = useState<number | null>(null);
   const [filters, setFilters] = useState<CaseListFilterState>(EMPTY_CASE_FILTERS);
   const listQuery = useQuery({
     queryKey: ["jobs-cancel"],
     queryFn: () =>
-      apiJson<{ data: Row[] }>("/api/v2/jobs?list=cancelled&limit=100"),
+      apiJson<{ data: Row[] }>("/api/v2/jobs?list=cancelled&limit=100", {
+        cache: "no-store",
+      }),
   });
 
   const restoreMutation = useMutation({
@@ -75,7 +84,7 @@ export function CancelCasesPage() {
       }),
     onSuccess: async () => {
       toast.success("Restored to active queue");
-      await queryClient.invalidateQueries({ queryKey: ["jobs-cancel"] });
+      await refreshJobSheets(queryClient);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -93,6 +102,7 @@ export function CancelCasesPage() {
     () => filterCaseRows(allRows, filters, "cancelled"),
     [allRows, filters],
   );
+  const sheet = useSheetPage(rows);
 
   return (
     <>
@@ -108,6 +118,7 @@ export function CancelCasesPage() {
         description="Restore a case to send it back into the active workflow"
         count={rows.length}
         totalCount={allRows.length}
+        mark="cancel"
         loading={listQuery.isLoading}
         error={
           listQuery.isError ? (listQuery.error as Error).message : null
@@ -125,6 +136,15 @@ export function CancelCasesPage() {
             surveyors={surveyors}
           />
         }
+        footer={
+          rows.length > 0 ? (
+            <SheetPager
+              page={sheet.page}
+              pageCount={sheet.pageCount}
+              onPage={sheet.setPage}
+            />
+          ) : null
+        }
       >
         {rows.length > 0 ? (
           <JobsTable>
@@ -141,9 +161,9 @@ export function CancelCasesPage() {
               </JobsTableRow>
             </JobsTableHeader>
             <TableBody>
-              {rows.map((row, index) => (
+              {sheet.pageItems.map((row, index) => (
                 <JobsTableRow key={row.id}>
-                  <JobSerialCell index={index} />
+                  <JobSerialCell index={sheet.start + index} />
                   <JobsTableCell>
                     <JobDtiCell value={row.dti_no ?? row.id} />
                   </JobsTableCell>
@@ -154,20 +174,17 @@ export function CancelCasesPage() {
                       "—"
                     )}
                   </JobsTableCell>
-                  <JobsTableCell className="font-medium">
-                    {row.cname ?? "—"}
+                  <JobsTableCell>
+                    <SheetPerson name={row.cname} />
                   </JobsTableCell>
                   <JobsTableCell>
-                    <div
-                      className="max-w-[140px] truncate"
-                      title={row.bankname}
-                    >
-                      {row.bankname ?? "—"}
-                    </div>
+                    <SheetBank name={row.bankname} />
                   </JobsTableCell>
-                  <JobsTableCell>{row.agent_name ?? "—"}</JobsTableCell>
-                  <JobsTableCell className="tabular-nums text-muted-foreground">
-                    {formatDeskDate(row.cancelled_at ?? row.updated_at)}
+                  <JobsTableCell>
+                    <SheetPerson name={row.agent_name} />
+                  </JobsTableCell>
+                  <JobsTableCell>
+                    <SheetDateTime value={row.cancelled_at ?? row.updated_at} />
                   </JobsTableCell>
                   <JobsTableCell>
                     <JobActions>
@@ -176,7 +193,7 @@ export function CancelCasesPage() {
                         icon={RotateCcw}
                         label="Restore"
                         disabled={restoreMutation.isPending}
-                        onClick={() => restoreMutation.mutate(row.id)}
+                        onClick={() => setRestoreId(row.id)}
                       />
                       <JobHistoryButton stage="cancel" job={row} />
                     </JobActions>
@@ -187,6 +204,23 @@ export function CancelCasesPage() {
           </JobsTable>
         ) : null}
       </JobsListingCard>
+      <ConfirmDialog
+  open={restoreId != null}
+  onOpenChange={(open) => {
+    if (!open) setRestoreId(null);
+  }}
+  tone="default"
+  title="Restore this case?"
+  description="The case will return to the active workflow."
+  confirmLabel="Restore"
+  loading={restoreMutation.isPending}
+  onConfirm={() => {
+    if (restoreId == null) return;
+    restoreMutation.mutate(restoreId, {
+      onSettled: () => setRestoreId(null),
+    });
+  }}
+/>
     </>
   );
 }

@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { toast as notice } from "@/lib/toast";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -74,6 +75,7 @@ export function BanksMasterPage() {
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [confirmSave, setConfirmSave] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{
     id: number;
     name: string;
@@ -101,7 +103,7 @@ export function BanksMasterPage() {
       });
     },
     onSuccess: async () => {
-      toast.success(editingId ? "Bank updated" : "Bank created");
+      notice.success(editingId ? "Bank updated" : "Bank created");
       setOpen(false);
       setEditingId(null);
       setForm(emptyForm);
@@ -117,7 +119,7 @@ export function BanksMasterPage() {
         body: JSON.stringify({ id }),
       }),
     onSuccess: async () => {
-      toast.success("Bank deleted");
+      notice.success("Bank deleted");
       await queryClient.invalidateQueries({ queryKey: ["masters-banks"] });
     },
     onError: (error: Error) => toast.error(error.message),
@@ -141,7 +143,7 @@ export function BanksMasterPage() {
         }
       />
 
-      <Card>
+      <Card className="overflow-hidden rounded-2xl border-border/70 shadow-sm">
         <CardHeader>
           <CardTitle>Bank list</CardTitle>
           <CardDescription>Create, edit, and delete banks.</CardDescription>
@@ -244,13 +246,27 @@ export function BanksMasterPage() {
             </Button>
             <Button
               disabled={saveMutation.isPending}
-              onClick={() => saveMutation.mutate()}
+              onClick={() => setConfirmSave(true)}
             >
               {saveMutation.isPending ? "Saving…" : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={confirmSave}
+        onOpenChange={setConfirmSave}
+        title={editingId ? "Save this bank?" : "Save new bank?"}
+        description="The record will be saved after you confirm."
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
+        loading={saveMutation.isPending}
+        onConfirm={() => {
+          setConfirmSave(false);
+          saveMutation.mutate();
+        }}
+      />
 
       <ConfirmDialog
         open={deleteTarget != null}
@@ -264,7 +280,8 @@ export function BanksMasterPage() {
             ? `“${deleteTarget.name}” will be removed. This cannot be undone.`
             : undefined
         }
-        confirmLabel="Delete"
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
         loading={deleteMutation.isPending}
         onConfirm={() => {
           if (!deleteTarget) return;

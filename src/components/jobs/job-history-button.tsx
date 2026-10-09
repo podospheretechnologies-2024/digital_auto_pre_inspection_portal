@@ -90,64 +90,19 @@ function formatTime(d: Date) {
 
 function eventKey(event: string): string {
   const e = event.toLowerCase();
+  if (e.includes("edit")) return "edit";
+  if (e.includes("change stage")) return "change_stage";
+  if (e.includes("resume")) return "resume";
+  if (e.includes("restore")) return "restore";
   if (e.includes("create") || e.includes("intimation")) return "create";
   if (e.includes("fresh")) return "fresh";
   if (e.includes("assign ro")) return "assign_ro";
   if (e.includes("assign")) return "assign";
   if (e.includes("inspect")) return "inspect";
   if (e.includes("quality") || e.includes("qc")) return "qc";
-  if (e.includes("hold") && !e.includes("resume")) return "hold";
+  if (e.includes("hold")) return "hold";
   if (e.includes("cancel")) return "cancel";
-  if (e.includes("resume")) return "resume";
-  if (e.includes("restore")) return "restore";
-  if (e.includes("change stage")) return "change_stage";
   return e.trim() || "other";
-}
-
-/**
- * Per desk: show only prior stages (not the current desk itself).
- * Cancel is terminal — include Cancel as the last line ("cancel tk").
- */
-function allowedKeysForStage(stage: JobHistoryStage): string[] {
-  switch (stage) {
-    case "fresh":
-      return ["create"];
-    case "assigned":
-      return ["create", "fresh"];
-    case "qc":
-      return ["create", "fresh", "assign_ro", "assign", "inspect"];
-    case "complete":
-      return ["create", "fresh", "assign_ro", "assign", "inspect", "qc"];
-    case "hold":
-      return ["create", "fresh", "assign_ro", "assign", "inspect", "qc"];
-    case "cancel":
-      return [
-        "create",
-        "fresh",
-        "assign_ro",
-        "assign",
-        "inspect",
-        "qc",
-        "hold",
-        "cancel",
-      ];
-  }
-}
-
-const KEY_ORDER = [
-  "create",
-  "fresh",
-  "assign_ro",
-  "assign",
-  "inspect",
-  "qc",
-  "hold",
-  "cancel",
-] as const;
-
-function keyRank(key: string): number {
-  const i = KEY_ORDER.indexOf(key as (typeof KEY_ORDER)[number]);
-  return i === -1 ? 99 : i;
 }
 
 /** Build timeline from job timestamps for stages missing from the history table. */
@@ -173,8 +128,6 @@ function synthesizeRows(job: JobHistorySource): HistoryRow[] {
   const createAt = job.job_created_at ?? job.created_at ?? job.cdate;
 
   push("Create Intimation", "Created the case intimation", createAt);
-  // Fresh Case sits after create in the workflow line
-  push("Fresh Case", "Case was in Fresh Case", createAt);
   push(
     "Assign Agent",
     job.agent_name
@@ -198,32 +151,23 @@ function synthesizeRows(job: JobHistorySource): HistoryRow[] {
   return rows;
 }
 
-/**
- * Merge logged + synthesized rows, then keep only stages allowed for this desk.
- * Order: Create Intimation on top → later stages below (oldest first).
- */
+/** Logged events, plus timestamps for steps not yet in the history table. Oldest first. */
 function buildStageHistory(
   logged: HistoryRow[],
   job: JobHistorySource,
-  stage: JobHistoryStage,
+  _stage: JobHistoryStage,
 ): HistoryRow[] {
-  const allowed = new Set(allowedKeysForStage(stage));
   const present = new Set(logged.map((r) => eventKey(r.event)));
   const extras = synthesizeRows(job).filter(
     (r) => !present.has(eventKey(r.event)),
   );
 
-  return [...logged, ...extras]
-    .filter((r) => allowed.has(eventKey(r.event)))
-    .sort((a, b) => {
-      const ka = eventKey(a.event);
-      const kb = eventKey(b.event);
-      const rank = keyRank(ka) - keyRank(kb);
-      if (rank !== 0) return rank;
-      const ta = parseWhen(a.created_at)?.getTime() ?? 0;
-      const tb = parseWhen(b.created_at)?.getTime() ?? 0;
-      return ta - tb;
-    });
+  return [...logged, ...extras].sort((a, b) => {
+    const ta = parseWhen(a.created_at)?.getTime() ?? 0;
+    const tb = parseWhen(b.created_at)?.getTime() ?? 0;
+    if (ta !== tb) return ta - tb;
+    return a.id - b.id;
+  });
 }
 
 export function JobHistoryButton({
@@ -269,10 +213,18 @@ export function JobHistoryButton({
               </DialogTitle>
               <DialogDescription className="text-[13px]">
                 <span className="font-semibold text-primary">{refLabel}</span>
-                <span className="text-muted-foreground">
-                  {" "}
-                  · Who did what on this case
-                </span>
+                {job.cname?.trim() ? (
+                  <span className="text-muted-foreground">
+                    {" "}
+                    · {job.cname.trim()}
+                  </span>
+                ) : null}
+                {job.vehicleno?.trim() ? (
+                  <span className="text-muted-foreground">
+                    {" "}
+                    · {job.vehicleno.trim()}
+                  </span>
+                ) : null}
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -352,17 +304,21 @@ export function JobHistoryButton({
                                   {row.user_name?.trim() || "System"}
                                 </div>
                                 <div className="truncate text-[11px] text-muted-foreground">
-                                  role :{" "}
                                   {row.user_role?.trim() ||
                                     (row.user_name?.trim() ? "User" : "System")}
                                 </div>
+                                {row.user_email?.trim() ? (
+                                  <div className="truncate text-[11px] text-muted-foreground">
+                                    {row.user_email.trim()}
+                                  </div>
+                                ) : null}
                               </div>
                             </div>
                           </td>
                           <td className="px-3 py-3 align-top">
                             <span
                               className={cn(
-                                "inline-flex max-w-[11rem] truncate rounded-md border border-border/80",
+                                "inline-flex rounded-md border border-border/80",
                                 "bg-muted/40 px-2 py-1 text-[11px] font-semibold text-foreground",
                               )}
                             >
